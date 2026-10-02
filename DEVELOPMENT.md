@@ -172,7 +172,7 @@ Use a disposable emulator: it refuses to overwrite existing installations or tes
 against an already-running HTTP listener on port 8080. For shared local devices, the wrapper acquires the
 device lock via `scripts/adb-device-lock.sh` before installation. CI uses a dedicated
 emulator and calls `scripts/smoke-minified.py` directly without locking. Both paths
-remove only their own installation and port forwarding. Results and filtered startup logs go
+remove only their own installation and port forwarding. Results and startup logs go
 to the output directory; CI uploads them even if the smoke check fails. Use
 `scripts/sign-smoke-apks.sh OUTPUT_DIR ALPHA_UNSIGNED_APK RELEASE_UNSIGNED_APK` to
 create disposable signed copies for this check. This covers startup, HTTP, and

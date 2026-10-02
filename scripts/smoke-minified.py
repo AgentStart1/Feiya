@@ -79,7 +79,11 @@ def main():
         if "Success" not in result:
             raise RuntimeError(result)
         installed = True
-        adb("shell", "am", "start", "-W", "-n", f"{package}/com.storyteller_f.feiya.MainActivity")
+        launch = adb("shell", "am", "start", "-W", "-n", f"{package}/com.storyteller_f.feiya.MainActivity")
+        (output / "launch.txt").write_text(launch + "\n")
+        print(launch, flush=True)
+        if "Error" in launch or "Status: timeout" in launch:
+            raise RuntimeError("Activity launch failed")
         deadline = time.monotonic() + 60
         while True:
             try:
@@ -105,7 +109,8 @@ def main():
         try:
             if installed:
                 try:
-                    (output / "runtime.log").write_text(adb("logcat", "-d", "-t", "2000", "-s", "AppServer", "AndroidRuntime", check=False))
+                    (output / "services.txt").write_text(adb("shell", "dumpsys", "activity", "services", package, check=False))
+                    (output / "runtime.log").write_text(adb("logcat", "-b", "all", "-d", "-t", "4000", check=False))
                 finally:
                     try:
                         adb("shell", "am", "force-stop", package, check=False)
