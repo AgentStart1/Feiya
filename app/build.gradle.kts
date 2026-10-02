@@ -116,6 +116,12 @@ kotlin {
 }
 
 dependencies {
+    constraints {
+        implementation(libs.androidx.concurrent.futures) {
+            because("AndroidX Test requires 1.2.0; AGP aligns test dependencies with the app runtime")
+        }
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -162,13 +168,6 @@ dependencies {
 
     implementation(libs.androidx.core.splashscreen)
     debugImplementation(libs.leakcanary.android)
-
-    val baoFolder = project.findProperty("baoFolder")
-    val baoModule = findProject(":bao:startup")
-    if (baoFolder == "local" && baoModule != null)
-        implementation(baoModule)
-    else
-        implementation("com.github.storytellerF.Bao:startup:e978cf52f2")
 
     val yongFolder = project.findProperty("yongFolder")
     val yongModule = findProject(":yong:library")
