@@ -8,9 +8,6 @@ directory (or configure `sdk.dir` in your local `local.properties`).
 ./gradlew :app:lintDebug
 ```
 
-APK assembly has a pre-existing resource merge failure:
-the Netty native QUIC jars contain duplicate `META-INF/license/LICENSE.webbit.txt`
-files. Run `./gradlew :app:testDebugUnitTest` independently to validate the JVM tests.
 Lint dependency resolution succeeds, but the current source has two existing
 `LocalContextGetResourceValueCall` errors in `MainActivity.kt` and `Messages.kt`.
 
@@ -27,6 +24,15 @@ Test JUnit 1.3.0. This raises the older transitive requirement from ProfileInsta
 without forcing an exact version or removing ProfileInstaller. Keep the constraint's
 version in `gradle/libs.versions.toml`; revisit it when upgrading AndroidX Test or when
 the app's other dependencies already require a compatible version.
+
+## APK resource packaging
+
+Netty native QUIC platform jars contain identical third-party license files under
+`META-INF/license/` and identical GraalVM configuration under
+`META-INF/native-image/io.netty/netty-codec-native-quic/`. The app uses scoped
+`packaging.resources.pickFirsts` rules to retain one copy of these resources in the
+APK. Keep the license notices; do not exclude all `META-INF` resources to resolve
+merge conflicts. Recheck the duplicate contents when upgrading Netty.
 
 ## HID keyboard
 

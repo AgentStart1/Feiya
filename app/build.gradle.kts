@@ -96,6 +96,11 @@ android {
         resources {
             excludes += ("/META-INF/{AL2.0,LGPL2.1}")
             pickFirsts += listOf("META-INF/*", "/META-INF/io.netty.versions.properties")
+            // Netty's platform jars bundle identical third-party license files.
+            // Keep one copy in the APK rather than excluding the notices.
+            pickFirsts += "META-INF/license/**"
+            // The same jars also repeat identical GraalVM configuration resources.
+            pickFirsts += "META-INF/native-image/io.netty/netty-codec-native-quic/**"
         }
         jniLibs {
             pickFirsts += "META-INF/*"
