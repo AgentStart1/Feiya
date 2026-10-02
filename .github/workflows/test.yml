@@ -45,8 +45,8 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            scripts/smoke-minified.sh emulator-5554 "$RUNNER_TEMP/minified-smoke/alpha.apk" com.storyteller_f.feiya.alpha app/build/reports/minified-smoke/alpha
-            scripts/smoke-minified.sh emulator-5554 "$RUNNER_TEMP/minified-smoke/release.apk" com.storyteller_f.feiya app/build/reports/minified-smoke/release
+            python3 scripts/smoke-minified.py emulator-5554 "$RUNNER_TEMP/minified-smoke/alpha.apk" com.storyteller_f.feiya.alpha app/build/reports/minified-smoke/alpha
+            python3 scripts/smoke-minified.py emulator-5554 "$RUNNER_TEMP/minified-smoke/release.apk" com.storyteller_f.feiya app/build/reports/minified-smoke/release
 
       - name: Upload minified smoke results
         if: always()

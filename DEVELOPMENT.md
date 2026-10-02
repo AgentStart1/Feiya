@@ -169,9 +169,10 @@ be optimized. Assemble success alone is not evidence that a minified app starts.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
-against an already-running HTTP listener on port 8080. The wrapper acquires the
-shared device lock via `scripts/adb-device-lock.sh` before installation, then removes
-only its own installation and port forwarding. Results and filtered startup logs go
+against an already-running HTTP listener on port 8080. For shared local devices, the wrapper acquires the
+device lock via `scripts/adb-device-lock.sh` before installation. CI uses a dedicated
+emulator and calls `scripts/smoke-minified.py` directly without locking. Both paths
+remove only their own installation and port forwarding. Results and filtered startup logs go
 to the output directory; CI uploads them even if the smoke check fails. Use
 `scripts/sign-smoke-apks.sh OUTPUT_DIR ALPHA_UNSIGNED_APK RELEASE_UNSIGNED_APK` to
 create disposable signed copies for this check. This covers startup, HTTP, and
