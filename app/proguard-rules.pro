@@ -263,3 +263,23 @@
 }
 -keepclassmembers class ch.qos.logback.** { *; }
 -keepattributes Signature
+
+# TypeParameterMatcher walks generic superclasses at runtime (including Ktor's
+# NettyDirectEncoder during WebSocket upgrade). Keep class structure/signatures;
+# unused classes may still shrink and names/members may still be obfuscated.
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToByteEncoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToByteEncoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageEncoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageEncoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageDecoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageDecoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageCodec
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageCodec
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.ByteToMessageCodec
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.ByteToMessageCodec
+-keep,allowshrinking,allowobfuscation class io.netty.channel.SimpleChannelInboundHandler
+-keep,allowshrinking,allowobfuscation class * extends io.netty.channel.SimpleChannelInboundHandler
+-keep,allowshrinking,allowobfuscation class io.netty.channel.SimpleUserEventChannelHandler
+-keep,allowshrinking,allowobfuscation class * extends io.netty.channel.SimpleUserEventChannelHandler
+-keep,allowshrinking,allowobfuscation class io.netty.resolver.AbstractAddressResolver
+-keep,allowshrinking,allowobfuscation class * extends io.netty.resolver.AbstractAddressResolver

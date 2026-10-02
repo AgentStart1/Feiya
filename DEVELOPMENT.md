@@ -176,6 +176,10 @@ with their original names, types, and volatility. R8 cannot infer those targets
 through Netty's class helper; keep the specific fields rather than all Netty code.
 Logback's XML configuration also requires the named Logcat appender and reflected
 bean/converter members. Keep them so minified builds retain server diagnostics.
+Netty's `TypeParameterMatcher` walks generic superclass signatures. Preserve the
+class structure of its generic handler/codec/resolver bases and subclasses as well
+as `Signature`; Ktor constructs `NettyDirectEncoder` during WebSocket upgrade, so
+removing its encoder superclass can break the handshake after HTTP has started.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
