@@ -255,3 +255,11 @@
 -keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index {
     volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index right;
 }
+
+# assets/logback.xml instantiates this class by name. Logback's XML configurator
+# also discovers bean properties and converter constructors reflectively.
+-keep class ch.qos.logback.classic.android.LogcatAppender {
+    public <init>();
+}
+-keepclassmembers class ch.qos.logback.** { *; }
+-keepattributes Signature

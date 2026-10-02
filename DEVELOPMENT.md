@@ -174,6 +174,8 @@ handle on Android; retain that fallback method for the non-VarHandle path.
 Its field updaters similarly require the `head`, `next`, `val`, and `right` fields
 with their original names, types, and volatility. R8 cannot infer those targets
 through Netty's class helper; keep the specific fields rather than all Netty code.
+Logback's XML configuration also requires the named Logcat appender and reflected
+bean/converter members. Keep them so minified builds retain server diagnostics.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
