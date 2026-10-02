@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Looper
 import com.storyteller_f.feiya.service.AppService
-import com.storyteller_f.feiya.service.specialEvent
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -56,8 +55,8 @@ class BootAndroidTest {
         saved.writeText("Shared before reboot")
         val notifications = app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         shadowOf(notifications).setNotificationsEnabled(false)
-        specialEvent.value = AppService.EVENT_OFF
         val controller = Robolectric.buildService(AppService::class.java)
+        controller.get().stop() // Queue Stop before onCreate, avoiding an automatic listener.
         try {
             controller.create()
             assertNotNull(shadowOf(controller.get()).lastForegroundNotification)
@@ -69,7 +68,6 @@ class BootAndroidTest {
             assertEquals(saved.name, restored.single().name)
         } finally {
             controller.destroy()
-            specialEvent.value = null
         }
     }
 }

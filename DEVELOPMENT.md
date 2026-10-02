@@ -106,6 +106,17 @@ shutdown closes all retained listeners and clients. Listeners are retained only
 for the current service lifetime; they continue to occupy their ports until stopped.
 Each listener retains its server/client so it can be reactivated without rebinding.
 
+Port-switch failures preserve the active `ServerState.Started` instance, keeping its
+self WebSocket, message cache, and refresh events usable. A separate failure event
+updates the foreground notification with the requested and still-active ports. With
+no active listener, startup failure remains `ServerState.Error`.
+
+Service commands use a service-owned, non-conflating channel closed on destruction, consumed by `collectServerEvents`
+alongside port changes. Each Stop/Restart is processed once, even for consecutive
+identical commands. A port change never replays a previous command. Regression tests
+exercise Stop → change port → Stop and real WebSocket messaging/cache/refresh after
+a failed port switch.
+
 Index/chat pages subscribe to port-change SSE events and replace their location,
 preserving the path, query, and fragment. The shared handler is `port-change.js`.
 

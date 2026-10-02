@@ -68,4 +68,5 @@
     <string name="boot_setting_saving">正在保存…</string>
     <string name="boot_setting_retry">重试</string>
     <string name="service_starting">正在启动服务…</string>
+    <string name="port_switch_failed">无法切换到端口 %1$d，服务继续使用 %2$d</string>
 </resources>

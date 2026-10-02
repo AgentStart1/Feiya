@@ -63,4 +63,5 @@
     <string name="boot_setting_saving">Saving…</string>
     <string name="boot_setting_retry">Retry</string>
     <string name="service_starting">Starting service…</string>
+    <string name="port_switch_failed">Could not switch to port %1$d. Service is still running on %2$d.</string>
 </resources>

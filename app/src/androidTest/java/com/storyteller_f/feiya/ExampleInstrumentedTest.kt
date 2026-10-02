@@ -8,7 +8,6 @@ import androidx.test.rule.ServiceTestRule
 import com.storyteller_f.feiya.service.AppServer
 import com.storyteller_f.feiya.service.AppService
 import com.storyteller_f.feiya.service.ServerState
-import com.storyteller_f.feiya.service.specialEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.defaultRequest
@@ -153,11 +152,14 @@ class ExampleInstrumentedTest {
             ApplicationProvider.getApplicationContext(),
             AppService::class.java
         )
-        specialEvent.value = AppService.EVENT_OFF
         try {
             val binder = serviceRule.bindService(serviceIntent)
             val serviceBinder = binder as AppService.ServiceBinder
             val service = serviceBinder.service
+            service.stop()
+            runBlocking {
+                service.server.state.first { it is ServerState.Stopped }
+            }
             block(serviceBinder, service, service.server)
         } finally {
             serviceRule.unbindService()

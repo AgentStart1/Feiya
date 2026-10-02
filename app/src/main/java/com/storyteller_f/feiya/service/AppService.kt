@@ -30,9 +30,8 @@ import io.ktor.server.response.respondBytesWriter
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -43,9 +42,8 @@ val Context.portFlow
         it[stringPreferencesKey("port")]?.toInt() ?: AppService.DEFAULT_PORT
     }
 
-val specialEvent = MutableStateFlow<Int?>(null)
-
 class AppService : LifecycleService() {
+    private val commands = Channel<Int>(Channel.UNLIMITED)
     val server by lazy { AppServer(this, (application as FeiyaApplication).serverCoordination) }
 
     override fun onBind(intent: Intent): IBinder {
@@ -71,17 +69,14 @@ class AppService : LifecycleService() {
 
         lifecycleScope.launch {
             cacheInvalid()
-            var previousPort: Int? = null
-            combine(portFlow, specialEvent) { port, eventPort ->
-                eventPort to port
-            }.collect { (event, port) ->
-                Log.i(TAG, "onCreate: port $event $port")
-                // A remembered stop/restart command must not replay when only the port changes.
-                val command = if (previousPort != null && previousPort != port) null else event
-                previousPort = port
-                server.onReceiveEventPort(port, command)
+            collectServerEvents(portFlow, commands, server::onReceiveEventPort)
+        }
+        lifecycleScope.launch {
+            server.portSwitchFailures.collect { failure ->
+                postForegroundNotify(getString(R.string.port_switch_failed, failure.requestedPort, failure.activePort))
             }
         }
+
         lifecycleScope.launch {
             server.state.collectLatest {
                 when (it) {
@@ -163,6 +158,7 @@ class AppService : LifecycleService() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() called")
+        commands.close()
         super.onDestroy()
         server.stopBlocking()
         lifecycleScope.cancel()
@@ -189,12 +185,12 @@ class AppService : LifecycleService() {
 
     fun restart() {
         postNotify("restart")
-        specialEvent.value = EVENT_RESTART
+        commands.trySend(EVENT_RESTART)
     }
 
     fun stop() {
         postNotify("stop")
-        specialEvent.value = EVENT_STOP
+        commands.trySend(EVENT_STOP)
     }
 
     class ServiceBinder(val service: AppService) : Binder() {

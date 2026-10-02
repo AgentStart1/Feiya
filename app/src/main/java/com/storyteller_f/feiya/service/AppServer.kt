@@ -42,6 +42,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -81,11 +83,15 @@ sealed interface ServerState {
     }
 }
 
+data class PortSwitchFailure(val requestedPort: Int, val activePort: Int, val cause: Throwable)
+
 class AppServer(service: AppService, private val coordination: CoroutineDispatcher) {
     private val scope = CoroutineScope(service.lifecycleScope.coroutineContext + coordination)
     private val context = service
     val state = MutableStateFlow<ServerState>(ServerState.Init)
     private val ports = PortHandoff(::createServer)
+    private val failures = Channel<PortSwitchFailure>(Channel.BUFFERED)
+    val portSwitchFailures = failures.receiveAsFlow()
 
     val messagesCache get() = (state.value as? ServerState.Started)?.messageList?.asStateFlow()
 
@@ -118,7 +124,7 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
             throw cancelled
         } catch (failure: Exception) {
             Log.e(TAG, "Unable to start requested server port", failure)
-            emitErrorState(failure)
+            reportStartFailure(port, failure)
         }
     }
 
@@ -175,8 +181,14 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
 
     private suspend fun startIfNeed(port: Int) = startInternal(port)
 
-    private fun emitErrorState(cause: Throwable) {
-        state.value = ServerState.Error(cause)
+    private suspend fun reportStartFailure(port: Int, cause: Throwable) {
+        val active = ports.current
+        if (active == null) {
+            state.value = ServerState.Error(cause)
+        } else {
+            state.value = active
+            failures.send(PortSwitchFailure(port, active.port, cause))
+        }
     }
 
     suspend fun onReceiveEventPort(port: Int, event: Int?) = withContext(coordination) {
@@ -202,7 +214,7 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
 
                 else -> {
                     val cause = IllegalAccessException("invalid port $port")
-                    emitErrorState(cause)
+                    reportStartFailure(port, cause)
                 }
             }
         }
