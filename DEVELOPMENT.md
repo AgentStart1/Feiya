@@ -237,3 +237,27 @@ authentication redirects, login, and bundled assets using a JVM server.
 Icons are vendored from [Phosphor Icons core 2.1.1](https://github.com/phosphor-icons/core)
 under its MIT license (`web/icons/LICENSE`). They need no runtime package or CDN.
 Use upstream SVG assets when adding icons and retain the license.
+
+### Message Markdown
+
+The Worker injects `web/markdown.mjs` into the Host and parses each incoming
+message once. It ignores any HTML supplied by the sender and publishes locally
+generated HTML alongside the original text. The DOM layer renders that markup;
+copying always uses the original text. Raw HTML stays disabled, and markdown-it's
+default dangerous-URL validation remains enabled. Links open separately with
+`noopener noreferrer`; Markdown images can load their referenced URLs.
+
+The browser bundle of markdown-it 15.0.2 and its license notices are checked in
+under `web/vendor/markdown-it/`; there is no runtime CDN dependency. After updating
+the pinned test-tool dependency and lockfile, regenerate the vendored files with:
+
+```sh
+npm ci --prefix tests/web
+npm --prefix tests/web run vendor:markdown
+npm --prefix tests/web test
+npm --prefix tests/web run test:browser
+```
+
+The vendoring script copies the official browser bundle and license files, omitting
+only its source-map reference. Keep raw HTML disabled and run the malicious-input
+fixtures when changing parser options or adding plugins.

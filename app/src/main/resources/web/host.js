@@ -102,7 +102,12 @@ export class WebHost {
         this.update({
           messages: Object.freeze([
             ...this.state.messages,
-            Object.freeze(message),
+            Object.freeze({
+              from: message.from,
+              data: message.data,
+              // Ignore any HTML field supplied over the socket.
+              html: this.io.renderMarkdown(message.data),
+            }),
           ]),
         });
       } catch {

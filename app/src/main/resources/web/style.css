@@ -162,7 +162,8 @@ textarea:focus-visible {
   flex-direction: column;
 }
 .topbar {
-  font-size: 20px;  height: 62px;
+  font-size: 20px;
+  height: 62px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -590,4 +591,120 @@ input {
   button {
     transition: background-color 0.15s ease;
   }
+}
+
+/* Parsed message content remains contained on narrow screens. */
+.markdown-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.message .markdown-body p {
+  white-space: normal;
+  margin: 0.6em 0;
+}
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 1em 0 0.4em;
+  line-height: 1.4;
+}
+.markdown-body h1 {
+  font-size: 1.6em;
+}
+.markdown-body h2 {
+  font-size: 1.4em;
+}
+.markdown-body h3 {
+  font-size: 1.2em;
+}
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: 1em;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.6em;
+  margin: 0.6em 0;
+}
+.markdown-body blockquote {
+  margin: 0.8em 0;
+  padding: 0.2em 1em;
+  border-left: 3px solid var(--green);
+  color: var(--muted);
+}
+.markdown-body code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  background: var(--rail);
+  border-radius: 4px;
+  padding: 0.15em 0.3em;
+}
+.markdown-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--rail);
+  white-space: pre;
+}
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  overflow-wrap: normal;
+}
+.markdown-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--rail);
+}
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+}
+.markdown-body a {
+  text-decoration: underline;
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1em 0;
+}
+
+/* Long Markdown scrolls inside the log, keeping the composer in view. */
+.chat {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.chat .workspace {
+  flex: 1;
+  min-height: 0;
+}
+.chat-content {
+  height: auto;
+  min-height: 0;
+}
+.messages {
+  min-height: 0;
 }
