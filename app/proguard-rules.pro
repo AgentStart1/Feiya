@@ -244,4 +244,14 @@
 # this literal method name, which R8 does not infer through Netty's cls() helper.
 -keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap {
     private static void acquireFenceFallback();
+    private volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index head;
+}
+# The same cls() helper hides the field-updater targets from R8. Preserve their
+# exact names/types and volatility; optimized APKs otherwise retain stale names.
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Node {
+    volatile java.lang.Object val;
+    volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Node next;
+}
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index {
+    volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index right;
 }

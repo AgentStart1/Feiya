@@ -171,6 +171,9 @@ initialization. Keep the named allocator/leak-aware buffer/reference-count utili
 methods in the rules; renaming or removing them causes an initialization crash.
 Netty's concurrent skip-list also resolves `acquireFenceFallback` through a method
 handle on Android; retain that fallback method for the non-VarHandle path.
+Its field updaters similarly require the `head`, `next`, `val`, and `right` fields
+with their original names, types, and volatility. R8 cannot infer those targets
+through Netty's class helper; keep the specific fields rather than all Netty code.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
