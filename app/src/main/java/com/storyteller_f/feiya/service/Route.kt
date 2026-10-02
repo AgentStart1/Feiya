@@ -8,7 +8,6 @@ import com.storyteller_f.feiya.shares
 import io.ktor.http.ContentDisposition
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.http.content.staticResources
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
@@ -19,8 +18,6 @@ import kotlinx.serialization.json.Json
 
 
 fun Route.contentRoute(context: Context) {
-    staticResources("/", null)
-
     get("/shares") {
         val encodeToString = Json.encodeToString(shares.value)
         call.respond(encodeToString)

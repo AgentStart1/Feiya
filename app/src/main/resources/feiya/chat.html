@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>消息 · Feiya</title>
+    <link rel="stylesheet" href="/web/style.css" />
+    <script type="module" src="/web/app.js"></script>
+  </head>
+  <body data-page="chat" class="chat">
+    <a class="skip-link" href="#main">跳至内容</a>
+    <aside class="sidebar">
+      <a class="brand" href="/">Feiya</a>
+      <p class="tagline">让分享更简单</p>
+      <nav class="nav" aria-label="主导航">
+        <a href="/"
+          ><span class="icon icon-file" aria-hidden="true"></span>文件</a
+        ><a href="/messages" aria-current="page"
+          ><span class="icon icon-chat" aria-hidden="true"></span>消息</a
+        >
+      </nav>
+      <div
+        class="connection"
+        id="connection"
+        data-status="connecting"
+        role="status"
+      >
+        <div class="connection-title">
+          <span class="icon icon-status" aria-hidden="true"></span
+          ><span id="connection-label">正在连接</span>
+        </div>
+        <small>保持手机服务开启</small>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">消息</header>
+      <main id="main" class="content chat-content">
+        <div class="heading">
+          <h1>消息</h1>
+          <button class="button" id="reconnect" hidden>重新连接</button>
+        </div>
+        <div
+          class="messages"
+          id="message-list"
+          role="log"
+          aria-label="聊天消息"
+          aria-live="polite"
+        >
+          <div class="notice" id="chat-empty">
+            <h2>在设备间传递文字</h2>
+            <p>发送链接、笔记或一小段文字。</p>
+          </div>
+        </div>
+        <p class="status-message" id="feedback" role="status"></p>
+        <form class="composer" id="composer">
+          <label for="input"
+            ><span class="sr-only">消息内容</span
+            ><textarea
+              id="input"
+              rows="2"
+              placeholder="输入消息…"
+            ></textarea></label
+          ><button class="button primary" id="send-button" disabled>
+            发送
+          </button>
+        </form>
+        <p class="composer-hint">Enter 发送 · Shift + Enter 换行</p>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>连接到 Feiya · Feiya</title>
+    <link rel="stylesheet" href="/web/style.css" />
+    <script type="module" src="/web/app.js"></script>
+  </head>
+  <body data-page="login" class="login">
+    <a class="skip-link" href="#main">跳至内容</a>
+    <aside class="sidebar">
+      <a class="brand" href="/">Feiya</a>
+      <p class="tagline">让分享更简单</p>
+      <nav class="nav" aria-label="主导航">
+        <a href="/"
+          ><span class="icon icon-file" aria-hidden="true"></span>文件</a
+        ><a href="/messages"
+          ><span class="icon icon-chat" aria-hidden="true"></span>消息</a
+        >
+      </nav>
+      <div
+        class="connection"
+        id="connection"
+        data-status="connecting"
+        role="status"
+      >
+        <div class="connection-title">
+          <span class="icon icon-status" aria-hidden="true"></span
+          ><span id="connection-label">等待连接</span>
+        </div>
+        <small>保持手机服务开启</small>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">连接到 Feiya</header>
+      <main id="main" class="content login-content">
+        <form class="login-form" id="login-form" method="post" action="/login">
+          <p class="eyebrow">手机共享</p>
+          <h1>连接到 Feiya</h1>
+          <p>输入手机上设置的访问密码，继续查看共享文件和消息。</p>
+          <input name="user" type="hidden" value="hidden" /><label
+            for="password"
+            >访问密码</label
+          ><input
+            name="password"
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="输入访问密码"
+          /><button class="button primary" type="submit">连接</button
+          ><button class="button" id="without-password" type="button">
+            未设置密码，直接进入
+          </button>
+          <p class="status-message" id="feedback" role="status"></p>
+          <noscript>未设置密码时，留空密码并点击连接。</noscript>
+        </form>
+      </main>
+    </div>
+  </body>
+</html>

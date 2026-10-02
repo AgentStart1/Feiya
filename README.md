@@ -95,3 +95,15 @@ can prevent Android from delivering the boot event; open it again to restore sta
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for building from source, tests, and current
 validation limitations.
+
+## Browser file sharing and messages
+
+Open the phone's server address in a browser on the same network. Enter the access
+password configured on the phone, or choose **未设置密码，直接进入** if none is set.
+The **文件** page lists files selected on the phone; choose **下载** beside a file
+to save it. The list refreshes automatically when the phone changes its selection.
+Use **消息** to send and copy text between connected devices. If the connection
+closes, the draft stays in the input; choose **重新连接** before sending again.
+
+The browser pages adapt to desktop and phone screens. Their styles, scripts, and
+icons are bundled with Feiya and do not require an external CDN.

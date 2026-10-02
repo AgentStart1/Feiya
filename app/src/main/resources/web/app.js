@@ -1,0 +1,225 @@
+const page = document.body.dataset.page;
+const $ = (id) => document.getElementById(id);
+const icon = (name) => {
+  const node = document.createElement("span");
+  node.className = `icon icon-${name}`;
+  node.setAttribute("aria-hidden", "true");
+  return node;
+};
+let worker;
+let renderedFiles = "";
+let renderedMessages = 0;
+let sending = false;
+let connected = false;
+const action = (data) => worker?.postMessage(data);
+const feedback = (text) => {
+  if ($("feedback")) $("feedback").textContent = text;
+};
+function fileKind(name) {
+  const extension = name.includes(".")
+    ? name.split(".").pop().toLowerCase()
+    : "";
+  const type = /^(png|jpe?g|gif|webp|svg|heic)$/.test(extension)
+    ? "image"
+    : /^(ppt|pptx)$/.test(extension)
+      ? "ppt"
+      : /^(zip|rar|7z|gz)$/.test(extension)
+        ? "zip"
+        : extension === "pdf"
+          ? "pdf"
+          : "file";
+  return { extension, type };
+}
+function renderFiles(state) {
+  // Never leave stale index-based download links active after a failed refresh.
+  $("file-table").hidden =
+    state.loading || !!state.error || !state.files.length;
+  $("retry-files").hidden = !state.error;
+  $("count").textContent = state.loading
+    ? "正在加载"
+    : state.error
+      ? "暂不可用"
+      : `${state.files.length} 个文件`;
+  const notice = $("file-notice");
+  notice.hidden = !state.loading && !state.error && !!state.files.length;
+  notice.querySelector("h2").textContent = state.loading
+    ? "正在获取共享文件"
+    : state.error
+      ? "暂时无法加载"
+      : "还没有共享文件";
+  notice.querySelector("p").textContent = state.loading
+    ? "请稍候…"
+    : state.error || "在手机上选择文件后，它们会自动出现在这里。";
+  const signature = JSON.stringify(state.files);
+  if (signature === renderedFiles) return;
+  renderedFiles = signature;
+  const rows = state.files.map((file) => {
+    const row = document.createElement("tr");
+    const nameCell = row.insertCell();
+    const wrapper = document.createElement("div");
+    wrapper.className = "file-name";
+    const { extension, type } = fileKind(file.name);
+    const glyph = icon("file");
+    glyph.className = "icon file-glyph";
+    glyph.dataset.type = type;
+    const name = document.createElement("span");
+    name.textContent = file.name;
+    wrapper.append(glyph, name);
+    nameCell.append(wrapper);
+    const typeCell = row.insertCell();
+    typeCell.className = "file-type";
+    typeCell.textContent = extension || "文件";
+    const link = document.createElement("a");
+    link.className = "download";
+    link.href = `/shares/${file.index}`;
+    link.setAttribute("aria-label", `下载 ${file.name}`);
+    link.append(icon("download"), document.createTextNode("下载"));
+    row.insertCell().append(link);
+    return row;
+  });
+  $("shares").replaceChildren(...rows);
+}
+async function copy(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext)
+      await navigator.clipboard.writeText(text);
+    else {
+      // LAN HTTP is not a secure context: use the browser's user-gesture copy path.
+      const previous = document.activeElement;
+      const field = document.createElement("textarea");
+      field.className = "sr-only";
+      field.value = text;
+      document.body.append(field);
+      field.select();
+      try {
+        if (!document.execCommand("copy")) throw new Error("copy");
+      } finally {
+        field.remove();
+        previous?.focus();
+      }
+    }
+    feedback("已复制消息");
+  } catch {
+    feedback("复制失败，请选中消息文字后手动复制。");
+  }
+}
+function renderChat(state) {
+  connected = state.connection === "connected";
+  $("reconnect").hidden = state.connection !== "disconnected";
+  $("send-button").disabled = !connected || sending || !$("input").value.trim();
+  feedback(state.error);
+  const list = $("message-list");
+  if (!renderedMessages) $("chat-empty").hidden = !!state.messages.length;
+  const nearEnd = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+  for (const message of state.messages.slice(renderedMessages)) {
+    const item = document.createElement("article");
+    item.className = "message";
+    const header = document.createElement("div");
+    header.className = "message-header";
+    const sender = document.createElement("span");
+    sender.textContent = message.from === "system" ? "系统" : message.from;
+    const button = document.createElement("button");
+    button.className = "copy";
+    button.type = "button";
+    button.append(icon("copy"), document.createTextNode("复制"));
+    button.addEventListener("click", () => copy(message.data));
+    const text = document.createElement("p");
+    text.textContent = message.data;
+    header.append(sender, button);
+    item.append(header, text);
+    list.append(item);
+  }
+  renderedMessages = state.messages.length;
+  if (nearEnd) list.scrollTop = list.scrollHeight;
+}
+function start() {
+  worker = new Worker("/web/worker.js", { type: "module" });
+  worker.onmessage = ({ data }) => {
+    if (data.type === "navigate") {
+      location.assign(data.url);
+      return;
+    }
+    if (data.type === "sent") {
+      sending = false;
+      if ($("input").value === data.text) $("input").value = "";
+      $("send-button").disabled = !connected || !$("input").value.trim();
+      return;
+    }
+    if (data.type !== "state") return;
+    const state = data.state;
+    $("connection").dataset.status = state.connection;
+    $("connection-label").textContent = {
+      connected: "已连接",
+      connecting: "正在连接",
+      disconnected: "连接已断开",
+      waiting: "等待连接",
+    }[state.connection];
+    if (page === "files") renderFiles(state);
+    if (page === "chat") {
+      if (state.error) sending = false;
+      renderChat(state);
+    }
+    if (page === "login") {
+      feedback(state.busy ? "正在连接…" : state.error);
+      $("login-form")
+        .querySelectorAll("button")
+        .forEach((button) => {
+          button.disabled = state.busy;
+        });
+    }
+  };
+  worker.onerror = () => {
+    $("connection-label").textContent = "页面加载失败，请刷新";
+    feedback("页面组件加载失败，请刷新后重试。");
+  };
+  action({ type: "start", page });
+}
+if (page === "files")
+  $("retry-files").onclick = () => action({ type: "refresh" });
+if (page === "chat") {
+  const send = () => {
+    if (sending || !connected || !$("input").value.trim()) return;
+    sending = true;
+    $("send-button").disabled = true;
+    action({ type: "send", text: $("input").value });
+  };
+  $("composer").onsubmit = (e) => {
+    e.preventDefault();
+    send();
+  };
+  $("input").oninput = () => {
+    $("send-button").disabled =
+      !connected || sending || !$("input").value.trim();
+  };
+  $("input").onkeydown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      send();
+    }
+  };
+  $("reconnect").onclick = () => action({ type: "connect" });
+}
+if (page === "login") {
+  $("login-form").onsubmit = (e) => {
+    e.preventDefault();
+    action({ type: "login", password: $("password").value });
+  };
+  $("without-password").onclick = () => action({ type: "login", password: "" });
+}
+addEventListener("pagehide", () => {
+  action({ type: "close" });
+  worker?.terminate();
+  worker = null;
+});
+addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    // A restored page creates a new Host, so discard the previous rendering cursor.
+    renderedMessages = 0;
+    if (page === "chat")
+      $("message-list")
+        .querySelectorAll(".message")
+        .forEach((item) => item.remove());
+    start();
+  }
+});
+start();
