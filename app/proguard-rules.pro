@@ -239,3 +239,9 @@
 -keepclassmembers class io.netty.util.ReferenceCountUtil {
     *** touch(...);
 }
+
+# Android takes Netty's non-VarHandle path; MethodHandles.Lookup.findStatic uses
+# this literal method name, which R8 does not infer through Netty's cls() helper.
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap {
+    private static void acquireFenceFallback();
+}
