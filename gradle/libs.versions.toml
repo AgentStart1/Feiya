@@ -34,6 +34,7 @@ serialization = "2.4.20"
 adaptive-android = "1.0.0"
 
 [libraries]
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor-server" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanist-permissions" }

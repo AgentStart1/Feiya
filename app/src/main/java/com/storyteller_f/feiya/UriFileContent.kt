@@ -1,153 +1,114 @@
 package com.storyteller_f.feiya
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
-import android.os.Build
-import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.util.Log
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpMethod
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.content.versions
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.http.content.LastModifiedVersion
 import io.ktor.server.response.respond
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.use
-import io.ktor.utils.io.jvm.nio.writeSuspendSession
-import io.ktor.utils.io.jvm.nio.writeWhile
+import io.ktor.utils.io.writeFully
 import io.ktor.utils.io.writer
-import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.EOFException
 import java.io.File
-import java.io.FileDescriptor
 import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.io.InputStream
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.util.UUID
-import kotlin.coroutines.CoroutineContext
+
+private data class UriMetadata(val type: ContentType, val size: Long?, val modified: Long?)
 
 suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: OutgoingContent.() -> Unit = {}) {
-    val it = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.contentResolver.query(file, null, null, null)
-    } else {
-        context.contentResolver.query(file, null, null, null, null)
-    }
-    if (it == null) {
-        respond(HttpStatusCode.NotFound)
-    } else {
-        it.use {
-            if (!it.moveToFirst()) {
-                respond(HttpStatusCode.NotFound)
-            } else {
-                val mimeTypeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                val lastModifiedIndex =
-                    it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                val mimeType = it.getString(mimeTypeIndex)
-                val size = it.getLong(sizeIndex)
-                val lastModified = it.getLong(lastModifiedIndex)
-                val parse = ContentType.parse(mimeType)
-                val fileDescriptor = context.contentResolver.openFileDescriptor(file, "r")
-                if (fileDescriptor == null) {
-                    respond(HttpStatusCode.NotFound)
-                } else {
-                    val content =
-                        UriFileContent(
-                            contentType = parse,
-                            parcelFileDescriptor = fileDescriptor,
-                            length = size,
-                            lastModified = lastModified
-                        ).apply(
-                            configure
-                        )
-                    respond(content)
-                }
-            }
+    val resolver = context.contentResolver
+    val metadata = withContext(Dispatchers.IO) {
+        resolver.query(file, null, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val mimeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val mime = if (mimeIndex >= 0 && !cursor.isNull(mimeIndex)) cursor.getString(mimeIndex) else resolver.getType(file)
+            UriMetadata(
+                mime?.let { runCatching { ContentType.parse(it) }.getOrNull() } ?: ContentType.Application.OctetStream,
+                cursor.optionalLong(OpenableColumns.SIZE)?.takeIf { it >= 0 },
+                cursor.optionalLong(DocumentsContract.Document.COLUMN_LAST_MODIFIED)?.takeIf { it > 0 },
+            )
         }
-
     }
+    if (metadata == null) {
+        respond(HttpStatusCode.NotFound)
+        return
+    }
+    if (request.local.method == HttpMethod.Head) {
+        respond(object : OutgoingContent.NoContent() {
+            override val contentType = metadata.type
+            override val contentLength = metadata.size
+            init {
+                if (metadata.modified != null) versions = versions + LastModifiedVersion(metadata.modified)
+            }
+        }.apply(configure))
+        return
+    }
+    respond(UriFileContent(
+        metadata.type, metadata.size, metadata.modified, CoroutineScope(currentCoroutineContext()),
+    ) { resolver.openInputStream(file) ?: throw FileNotFoundException("Shared document is unavailable") }.apply(configure))
 }
 
+private fun Cursor.optionalLong(column: String): Long? {
+    val index = getColumnIndex(column)
+    return if (index >= 0 && !isNull(index)) getLong(index) else null
+}
+
+/** Opens a fresh stream only when the response body is consumed, including each range. */
 class UriFileContent(
     override val contentType: ContentType,
-    private val parcelFileDescriptor: ParcelFileDescriptor,
-    private val length: Long,
-    lastModified: Long,
+    override val contentLength: Long?,
+    lastModified: Long?,
+    private val scope: CoroutineScope,
+    private val openStream: () -> InputStream,
 ) : OutgoingContent.ReadChannelContent() {
-
-    override val contentLength: Long get() = length
-    private val fileDescriptor: FileDescriptor get() = parcelFileDescriptor.fileDescriptor
-
     init {
-        //todo check file exists
-        versions = versions + LastModifiedVersion(lastModified)
+        if (lastModified != null) versions = versions + LastModifiedVersion(lastModified)
     }
 
-    // TODO: consider using WriteChannelContent to avoid piping
-    // Or even make it dual-content so engine implementation can choose
-    override fun readFrom(): ByteReadChannel = fileDescriptor.readChannel(length = length)
+    override fun readFrom(): ByteReadChannel = readStream(0, contentLength)
 
-    override fun readFrom(range: LongRange): ByteReadChannel = fileDescriptor.readChannel(range.first, range.last, length = length)
-}
+    override fun readFrom(range: LongRange): ByteReadChannel =
+        if (range.isEmpty()) ByteReadChannel.Empty else readStream(range.first, range.last - range.first + 1)
 
-fun FileDescriptor.readChannel(
-    start: Long = 0,
-    endInclusive: Long = -1,
-    coroutineContext: CoroutineContext = Dispatchers.IO,
-    length: Long,
-): ByteReadChannel {
-    return CoroutineScope(coroutineContext).writer(CoroutineName("file-reader") + coroutineContext, autoFlush = false) {
-        require(start >= 0L) { "start position shouldn't be negative but it is $start" }
-        require(endInclusive <= length - 1) {
-            "endInclusive points to the position out of the file: file size = $length, endInclusive = $endInclusive"
-        }
-
-        FileInputStream(this@readChannel).use { file ->
-            val fileChannel: FileChannel = file.channel
-            if (start > 0) {
-                fileChannel.position(start)
+    private fun readStream(start: Long, length: Long?): ByteReadChannel = scope.writer(Dispatchers.IO) {
+        openStream().use { input ->
+            // Providers may return pipes, so do not require a seekable file descriptor.
+            var skip = start
+            while (skip > 0) {
+                currentCoroutineContext().ensureActive()
+                val skipped = input.skip(skip)
+                if (skipped > 0) skip -= skipped
+                else if (input.read() >= 0) skip--
+                else throw EOFException("Shared document ended before the requested range")
             }
-
-            if (endInclusive == -1L) {
-                @Suppress("DEPRECATION")
-                channel.writeSuspendSession {
-                    while (true) {
-                        val buffer = request(1)
-                        if (buffer == null) {
-                            channel.flush()
-                            tryAwait(1)
-                            continue
-                        }
-
-                        val rc = fileChannel.read(buffer)
-                        if (rc == -1) break
-                        written(rc)
-                    }
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var remaining = length
+            while (remaining == null || remaining > 0) {
+                currentCoroutineContext().ensureActive()
+                val count = input.read(buffer, 0, remaining?.coerceAtMost(buffer.size.toLong())?.toInt() ?: buffer.size)
+                if (count < 0) {
+                    if (remaining != null && remaining > 0) throw EOFException("Shared document was truncated")
+                    break
                 }
-
-                return@use
-            }
-
-            var position = start
-            channel.writeWhile { buffer ->
-                val fileRemaining = endInclusive - position + 1
-                val rc = if (fileRemaining < buffer.remaining()) {
-                    val l = buffer.limit()
-                    buffer.limit(buffer.position() + fileRemaining.toInt())
-                    val r = fileChannel.read(buffer)
-                    buffer.limit(l)
-                    r
-                } else {
-                    fileChannel.read(buffer)
-                }
-
-                if (rc > 0) position += rc
-
-                rc != -1 && position <= endInclusive
+                channel.writeFully(buffer, 0, count)
+                remaining = remaining?.minus(count)
             }
         }
     }.channel

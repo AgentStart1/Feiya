@@ -84,3 +84,15 @@ version in [README.md](README.md) and a target computer. The validation checklis
 - In macOS Keyboard Setup Assistant, verify ANSI and ISO recognition with each text
   layout selected and with a Bluetooth name that does not contain `Mac`.
 - Disconnect during a send and verify a new send works after reconnecting.
+
+## HTTP downloads
+
+`respondUri` reads optional provider metadata on the IO dispatcher. Unknown or
+negative sizes remain unknown; they must not become `Content-Length: 0`. The response
+opens a fresh input stream for each body/range and closes it on completion or
+cancellation. HEAD requests return metadata without opening a stream. Providers
+need not supply DocumentsContract MIME/last-modified columns or seekable descriptors.
+
+Local HTTP tests cover unknown sizes, optional metadata, full/range/HEAD responses,
+empty files, and cancellation cleanup. Windows browser validation with the original
+provider/file from issue #6 remains necessary for platform-specific confirmation.
