@@ -3,6 +3,8 @@ package com.storyteller_f.feiya.ui.components
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,14 +16,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,12 +30,11 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.storyteller_f.feiya.Colemak
-import com.storyteller_f.feiya.Dvorak
+import com.storyteller_f.feiya.HidKeyboardState
+import com.storyteller_f.feiya.TargetKeyboardLayout
+import com.storyteller_f.feiya.KeyboardCalibration
 import com.storyteller_f.feiya.HidState
-import com.storyteller_f.feiya.KeyboardInterfaceInterceptor
 import com.storyteller_f.feiya.R
-import com.storyteller_f.feiya.keyboardInterceptor
 
 class ComposeBluetoothDevice(val name: String, val address: String)
 
@@ -88,6 +86,13 @@ fun HidScreen(
     requestPermission: () -> Unit = {},
     connectDevice: (String) -> Boolean = { false },
     sendText: (String) -> Unit = {},
+    keyboardState: HidKeyboardState = HidKeyboardState(),
+    editContent: (String) -> Unit = {},
+    sendContent: () -> Unit = {},
+    selectLayout: (TargetKeyboardLayout) -> Unit = {},
+    selectCalibration: (KeyboardCalibration) -> Unit = {},
+    sendLeftCalibrationKey: () -> Unit = {},
+    sendRightCalibrationKey: () -> Unit = {},
     disconnect: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -111,7 +116,10 @@ fun HidScreen(
             connectDevice
         )
 
-        is HidState.Done -> ConnectedPage(rootModifier, bluetoothState, sendText) {
+        is HidState.Done -> ConnectedPage(
+            rootModifier, bluetoothState, sendText, keyboardState, editContent, sendContent,
+            selectLayout, selectCalibration, sendLeftCalibrationKey, sendRightCalibrationKey,
+        ) {
             disconnect(bluetoothState.device.address)
         }
     }
@@ -147,80 +155,70 @@ private fun ConnectedPage(
     modifier: Modifier,
     bluetoothState: HidState.Done,
     sendText: (String) -> Unit,
+    keyboardState: HidKeyboardState,
+    editContent: (String) -> Unit,
+    sendContent: () -> Unit,
+    selectLayout: (TargetKeyboardLayout) -> Unit,
+    selectCalibration: (KeyboardCalibration) -> Unit,
+    sendLeftCalibrationKey: () -> Unit,
+    sendRightCalibrationKey: () -> Unit,
     disconnect: () -> Unit,
 ) {
-    var content by remember {
-        mutableStateOf("")
-    }
-    Column(modifier = modifier.padding(8.dp)) {
+    Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
         Text(
-            text = stringResource(
-                id = R.string.connected_device_tip,
-                bluetoothState.device.name
-            ), style = MaterialTheme.typography.titleMedium
+            text = stringResource(R.string.connected_device_tip, bluetoothState.device.name),
+            style = MaterialTheme.typography.titleMedium,
         )
-        Button(onClick = {
-            disconnect()
-        }) {
-            Text(text = "断开连接")
+        Button(onClick = disconnect) {
+            Text(text = stringResource(R.string.hid_disconnect))
         }
-        Text(text = stringResource(R.string.test_case))
-        Row {
-            Button(onClick = {
-                sendText("serviceBinder")
-            }) {
-                Text(text = "serviceBinder")
-            }
-            if (bluetoothState.device.name.contains("Mac")) {
-                Button(onClick = {
-                    sendText("z")
-                }) {
-                    Text(text = "z")
-                }
-                Button(onClick = {
-                    sendText("/")
-                }) {
-                    Text(text = "/")
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextField(value = content, onValueChange = {
-                content = it
-            }, modifier = Modifier.weight(1f))
-            Button(onClick = {
-                sendText(content)
-            }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text(text = stringResource(id = R.string.send))
-            }
-        }
-        val interceptor = keyboardInterceptor[KeyboardInterfaceInterceptor.key]
-        if (interceptor == null) {
-            Column {
-                listOf(Dvorak, Colemak).forEach {
-                    Button(onClick = {
-                        keyboardInterceptor[KeyboardInterfaceInterceptor.key] = it
-                    }) {
-                        Text(
-                            text = stringResource(
-                                R.string.plug_dvorak_keyboard_style,
-                                it.javaClass.simpleName
-                            )
-                        )
-                    }
-                }
-            }
-        } else {
-            Button(onClick = {
-                keyboardInterceptor.remove(KeyboardInterfaceInterceptor.key)
-            }) {
-                Text(
-                    text = stringResource(
-                        R.string.unplug_dvorak_keyboard_style,
-                        interceptor.javaClass.simpleName
-                    )
+        Text(text = stringResource(R.string.hid_target_layout))
+        Text(text = stringResource(R.string.hid_target_layout_help))
+        Column {
+            TargetKeyboardLayout.entries.forEach { layout ->
+                FilterChip(
+                    selected = keyboardState.layout == layout,
+                    onClick = { selectLayout(layout) },
+                    label = { Text(layout.name) },
                 )
             }
+        }
+        TextField(
+            value = keyboardState.content,
+            onValueChange = editContent,
+            label = { Text(stringResource(R.string.hid_text)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(onClick = sendContent) {
+            Text(text = stringResource(R.string.send))
+        }
+        Button(onClick = { sendText("serviceBinder") }) {
+            Text(text = stringResource(R.string.hid_send_test))
+        }
+        Text(
+            text = stringResource(R.string.hid_mac_calibration),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(text = stringResource(R.string.hid_mac_calibration_help))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KeyboardCalibration.entries.forEach { calibration ->
+                FilterChip(
+                    selected = keyboardState.calibration == calibration,
+                    onClick = { selectCalibration(calibration) },
+                    label = { Text(calibration.name) },
+                )
+            }
+        }
+        Text(text = stringResource(R.string.hid_mac_left_step))
+        Button(onClick = sendLeftCalibrationKey) {
+            Text(text = stringResource(
+                if (keyboardState.calibration == KeyboardCalibration.ANSI) R.string.hid_physical_z
+                else R.string.hid_physical_iso,
+            ))
+        }
+        Text(text = stringResource(R.string.hid_mac_right_step))
+        Button(onClick = sendRightCalibrationKey) {
+            Text(text = stringResource(R.string.hid_physical_slash))
         }
     }
 }

@@ -24,11 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.feiya.ui.components.ComposeBluetoothDevice
 
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 interface BluetoothHidController {
@@ -38,7 +37,7 @@ interface BluetoothHidController {
 
     fun disconnectDevice(address: String): Boolean
 
-    suspend fun sendText(content: String): Boolean
+    suspend fun sendRawKey(key: HidKey): Boolean
 
     fun start()
 
@@ -53,7 +52,7 @@ class NoOpBluetoothHidController : BluetoothHidController {
     override fun connectDevice(address: String) = false
     override fun disconnectDevice(address: String) = false
 
-    override suspend fun sendText(content: String) = false
+    override suspend fun sendRawKey(key: HidKey) = false
     override fun start() = Unit
 
     @Composable
@@ -80,7 +79,7 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
     )
     private var bluetoothPermissionIndex by mutableIntStateOf(0)
 
-    private val channel = Channel<String>()
+    private val keyboard = RawHidKeyboard()
     private var connectedDevice by mutableStateOf<BluetoothDevice?>(null)
     private var connecting by mutableStateOf<String?>(null)
 
@@ -163,15 +162,6 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
                 bluetoothManager.closeBluetoothProfile(hidDevice)
             }
         })
-        context.lifecycleScope.launch {
-            for (s in channel) {
-                val hid = hidDevice ?: continue
-                val device = connectedDevice ?: continue
-                s.toKeyCode { code ->
-                    context.sendReport(hid, device, code.second, code.first)
-                }
-            }
-        }
     }
 
     private fun bluetoothDevice(intent: Intent) =
@@ -236,13 +226,23 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
         return context.disconnectDevice(hidDevice, bondDevices, address)
     }
 
-    override suspend fun sendText(content: String): Boolean {
-        val hid = hidDevice
-        val device = connectedDevice
-        return if (hid != null && device != null) {
-            channel.send(content)
-            true
-        } else false
+    @SuppressLint("MissingPermission")
+    override suspend fun sendRawKey(key: HidKey): Boolean {
+        // Bluetooth/Compose state belongs to the main thread. Capture one target for
+        // both reports so a reconnect cannot send the release to another computer.
+        val target = withContext(Dispatchers.Main.immediate) {
+            val context = context.get()
+            val hid = hidDevice
+            val device = connectedDevice
+            if (context != null && context.permissionOk() && hid != null && device != null) {
+                hid to device
+            } else null
+        } ?: return false
+        return withContext(Dispatchers.IO) {
+            keyboard.sendRawKey(key) { report ->
+                target.first.sendReport(target.second, 2, report)
+            }
+        }
     }
 
     override fun refreshBondDevices() {
