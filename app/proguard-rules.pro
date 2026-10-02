@@ -283,3 +283,22 @@
 -keep,allowshrinking,allowobfuscation class * extends io.netty.channel.SimpleUserEventChannelHandler
 -keep,allowshrinking,allowobfuscation class io.netty.resolver.AbstractAddressResolver
 -keep,allowshrinking,allowobfuscation class * extends io.netty.resolver.AbstractAddressResolver
+
+# Netty inspects @Sharable through the handler's class hierarchy and @Skip via
+# getMethod(name, ...). Full-mode R8 needs explicit targets as well as attributes.
+-keep,allowobfuscation @interface io.netty.channel.ChannelHandler$Sharable
+-keep,allowshrinking,allowobfuscation @io.netty.channel.ChannelHandler$Sharable class *
+-keep,allowobfuscation @interface io.netty.channel.ChannelHandlerMask$Skip
+-keepclassmembers class * implements io.netty.channel.ChannelHandler {
+    public void channel*(...);
+    public void exceptionCaught(...);
+    public void userEventTriggered(...);
+    public void bind(...);
+    public void connect(...);
+    public void disconnect(...);
+    public void close(...);
+    public void deregister(...);
+    public void read(...);
+    public void write(...);
+    public void flush(...);
+}

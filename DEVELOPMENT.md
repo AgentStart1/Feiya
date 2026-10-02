@@ -180,6 +180,10 @@ Netty's `TypeParameterMatcher` walks generic superclass signatures. Preserve the
 class structure of its generic handler/codec/resolver bases and subclasses as well
 as `Signature`; Ktor constructs `NettyDirectEncoder` during WebSocket upgrade, so
 removing its encoder superclass can break the handshake after HTTP has started.
+Preserve `@Sharable` handler classes and the `@Skip` callback metadata/names, too:
+Netty checks them reflectively to decide whether handlers can be reused and which
+callbacks must run. Removing `@Sharable` prevents subsequent connections from
+installing the shared channel initializer.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
