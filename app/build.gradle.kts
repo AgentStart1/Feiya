@@ -3,9 +3,9 @@ import java.io.FileWriter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.starter.easylauncher") version "6.4.1"
+    alias(libs.plugins.android)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.easylauncher)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.storyteller_f.feiya"
-        minSdk = 24
+        minSdk = 33
         targetSdk = 37
         versionCode = 8
         versionName = "1.8"
@@ -88,10 +88,19 @@ android {
         resValues = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             excludes += ("/META-INF/{AL2.0,LGPL2.1}")
             pickFirsts += listOf("META-INF/*", "/META-INF/io.netty.versions.properties")
+            // Netty's platform jars bundle identical third-party license files.
+            // Keep one copy in the APK rather than excluding the notices.
+            pickFirsts += "META-INF/license/**"
+            // The same jars also repeat identical GraalVM configuration resources.
+            pickFirsts += "META-INF/native-image/io.netty/netty-codec-native-quic/**"
         }
         jniLibs {
             pickFirsts += "META-INF/*"
@@ -116,8 +125,15 @@ kotlin {
 }
 
 dependencies {
+    constraints {
+        implementation(libs.androidx.concurrent.futures) {
+            because("AndroidX Test requires 1.2.0; AGP aligns test dependencies with the app runtime")
+        }
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.service)
 
@@ -138,7 +154,10 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.ui.test.junit4)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
@@ -160,13 +179,6 @@ dependencies {
 
     implementation(libs.androidx.core.splashscreen)
     debugImplementation(libs.leakcanary.android)
-
-    val baoFolder = project.findProperty("baoFolder")
-    val baoModule = findProject(":bao:startup")
-    if (baoFolder == "local" && baoModule != null)
-        implementation(baoModule)
-    else
-        implementation("com.github.storytellerF.Bao:startup:e978cf52f2")
 
     val yongFolder = project.findProperty("yongFolder")
     val yongModule = findProject(":yong:library")

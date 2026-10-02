@@ -60,6 +60,9 @@ import androidx.core.view.WindowCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -132,6 +135,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val keyboardHost by lazy {
+        HidKeyboardHost(
+            (application as FeiyaApplication).keyboardCoordination,
+            bluetoothController.keyboardConnection,
+        )
+    }
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -193,14 +203,23 @@ class MainActivity : ComponentActivity() {
             val screenHeight = with(density) { configuration.screenHeightDp.dp.roundToPx() }
             val currentBackStackEntryAsState by navController.currentBackStackEntryAsState()
 
-            val sendText: (String) -> Unit = {
-                scope.launch {
-                    if (!bluetoothController.sendText(it)) {
-                        Toast.makeText(context, "未连接到任何设备", Toast.LENGTH_SHORT).show()
-                        navController.navigate("hid")
+            LaunchedEffect(keyboardHost, navController) {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    keyboardHost.effects.collect { effect ->
+                        val message = when (effect) {
+                            HidKeyboardEffect.UNSUPPORTED_TEXT -> R.string.hid_unsupported_text
+                            HidKeyboardEffect.SEND_FAILED -> R.string.hid_send_failed
+                            HidKeyboardEffect.CONNECTION_CHANGED -> R.string.hid_connection_changed
+                            HidKeyboardEffect.SENT -> R.string.hid_task_sent
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        if (effect == HidKeyboardEffect.SEND_FAILED || effect == HidKeyboardEffect.CONNECTION_CHANGED) {
+                            navController.navigate("hid") { launchSingleTop = true }
+                        }
                     }
                 }
             }
+            val sendText: (String) -> Unit = keyboardHost::sendText
             val showAboutWebView = {
                 val builder = CustomTabsIntent.Builder()
                     .setInitialActivityHeightPx((screenHeight * 0.7).toInt())
@@ -412,11 +431,21 @@ class MainActivity : ComponentActivity() {
             Messages()
         }
         composable("hid") {
-            HidScreen(state, requestPermission, {
-                bluetoothController.connectDevice(it)
-            }, sendText) {
-                bluetoothController.disconnectDevice(it)
-            }
+            val keyboardState by keyboardHost.state.collectAsStateWithLifecycle()
+            HidScreen(
+                bluetoothState = state,
+                requestPermission = requestPermission,
+                connectDevice = bluetoothController::connectDevice,
+                sendText = sendText,
+                keyboardState = keyboardState,
+                cancelTask = keyboardHost::cancelTask,
+                cancelAll = keyboardHost::cancelAll,
+                selectLayout = keyboardHost::selectLayout,
+                selectCalibration = keyboardHost::selectCalibration,
+                sendLeftCalibrationKey = keyboardHost::sendLeftCalibrationKey,
+                sendRightCalibrationKey = keyboardHost::sendRightCalibrationKey,
+                disconnect = { bluetoothController.disconnectDevice(it) },
+            )
         }
         composable("safe") {
             SafePage()
@@ -424,6 +453,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        keyboardHost.close()
         super.onDestroy()
         unbindService(serviceConnection)
         unbindService(chromeConnection)

@@ -28,10 +28,37 @@
     <string name="bluetooth_pair_tip" translatable="false">去配对</string>
     <string name="no_expacted_bluetooth_pair_tip" translatable="false">找不到预期的设备，去配对</string>
     <string name="connected_device_tip">当前设备: %s</string>
-    <string name="plug_dvorak_keyboard_style">我使用了%s 特殊键盘布局</string>
-    <string name="unplug_dvorak_keyboard_style">移除%s 键盘布局</string>
     <string name="test_case">测试用例</string>
     <string name="send">发送</string>
     <string name="add_file">添加</string>
     <string name="delete_all">删除全部</string>
+    <string name="hid_disconnect">断开连接</string>
+    <string name="hid_target_layout">目标电脑键盘布局</string>
+    <string name="hid_target_layout_help">选择目标电脑当前使用的布局，并关闭大写锁定。支持英文、数字、符号和常用控制键。</string>
+    <string name="hid_text">要发送的文本</string>
+    <string name="hid_send_test">发送测试文本：serviceBinder</string>
+    <string name="hid_mac_calibration">macOS 键盘设置助理</string>
+    <string name="hid_mac_calibration_help">在目标 Mac 上打开键盘设置助理，选择要识别的键盘类型，再按助理提示发送按键。</string>
+    <string name="hid_mac_left_step">第 1 步：助理要求按左 Shift 右侧的键时</string>
+    <string name="hid_mac_right_step">第 2 步：助理要求按右 Shift 左侧的键时</string>
+    <string name="hid_physical_z">发送物理 Z 键</string>
+    <string name="hid_physical_iso">发送 ISO 额外键（左 Shift 旁）</string>
+    <string name="hid_physical_slash">发送物理 / 键</string>
+    <string name="hid_unsupported_text">文本包含不支持的字符，未发送。请使用英文、数字或 ASCII 符号。</string>
+    <string name="hid_send_failed">发送失败，请检查蓝牙连接和权限后重试。</string>
+    <string name="hid_tasks">发送任务</string>
+    <string name="hid_cancel_all">全部取消</string>
+    <string name="hid_cancel">取消</string>
+    <string name="hid_task_key">按键</string>
+    <string name="hid_task_target">#%1$d · %2$s → %3$s</string>
+    <string name="hid_task_progress">%1$s · %2$d/%3$d 个按键</string>
+    <string name="hid_task_queued">排队中</string>
+    <string name="hid_task_sending">发送中</string>
+    <string name="hid_task_cancelling">取消中</string>
+    <string name="hid_task_sent">已发送</string>
+    <string name="hid_task_failed">发送失败</string>
+    <string name="hid_task_cancelled">已取消</string>
+    <string name="hid_not_connected">未连接设备</string>
+    <string name="hid_connection_changed">连接已改变，任务已停止。请确认目标设备后重新发送。</string>
+    <string name="hid_progress_help">进度按完成的按下/松开计数；已发送表示蓝牙接口接受了报告，不代表电脑已输入。取消不会撤回已发送的按键。</string>
 </resources>

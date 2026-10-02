@@ -1,7 +1,6 @@
 package com.storyteller_f.feiya
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
@@ -9,13 +8,8 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.storyteller_f.feiya.R
-import kotlinx.coroutines.delay
-import java.util.concurrent.Executors
 
 sealed interface BluetoothAction {
     object NotSupport : BluetoothAction
@@ -102,7 +96,7 @@ fun Context.registerAsHid(
             sdp,
             null,
             null,
-            Executors.newCachedThreadPool(),
+            ContextCompat.getMainExecutor(this),
             registerCallback
         )
     }
@@ -121,56 +115,6 @@ fun Context.unRegisterAsHid(hidDevice: BluetoothHidDevice?) {
             return
         }
     }
-}
-
-suspend fun Context.sendReport(
-    hidDevice: BluetoothHidDevice,
-    selectedDevice: BluetoothDevice,
-    modification: Int,
-    code: Int
-) {
-    Log.d(
-        "System",
-        "sendReport() called with: hidDevice = $hidDevice, selectedDevice = $selectedDevice, code = $modification, f = $code"
-    )
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            sendKeyEvent(hidDevice, selectedDevice, modification, code)
-        }
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.BLUETOOTH_ADMIN
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            sendKeyEvent(hidDevice, selectedDevice, modification, code)
-        }
-    }
-
-}
-
-@RequiresApi(Build.VERSION_CODES.P)
-@SuppressLint("MissingPermission")
-private suspend fun sendKeyEvent(
-    hidDevice: BluetoothHidDevice,
-    selectedDevice: BluetoothDevice,
-    modification: Int,
-    code: Int
-) {
-    val downResult = hidDevice.sendReport(
-        selectedDevice,
-        2,
-        byteArrayOf(modification.toByte(), code.toByte())
-    )
-    Log.d("System", "sendReport: down $code $downResult")
-    delay(100)
-    val upResult = hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0))
-    Log.d("System", "sendReport: up $upResult")
-    delay(100)
 }
 
 fun Context.connectDevice(
@@ -228,32 +172,6 @@ fun Context.disconnectDevice(
             ) hidDevice.disconnect(device) else false
         }
         else -> false
-    }
-}
-
-inline fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
-    keyboardInterceptor.values.fold(this) { s, f ->
-        f.intercept(s)
-    }.forEach {
-        when (it) {
-            in 'a'..'z' -> block(it - 'a' + 4 to 0)
-
-            in 'A'..'Z' -> block(it - 'A' to 2)
-
-            in '1'..'9' -> block(it - '1' + 30 to 0)
-
-            '0' -> block(39 to 0)
-            '-' -> block(45 to 0)
-            '=' -> block(46 to 0)
-            '[' -> block(47 to 0)
-            ']' -> block(48 to 0)
-            '\\' -> block(49 to 0)
-            ':' -> block(51 to 2)
-            '.' -> block(55 to 0)
-            '/' -> block(56 to 0)
-            else -> throw Exception("$it not recognized")
-        }
-
     }
 }
 

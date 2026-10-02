@@ -7,8 +7,5 @@
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
     </style>
 
-    <style name="Theme.App" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="exceptionPageTheme">@style/Theme.Bao</item>
-    </style>
-    <style name="Theme.Bao" parent="Theme.AppCompat.Light"/>
+    <style name="Theme.App" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

@@ -16,7 +16,6 @@ dependencyResolutionManagement {
 rootProject.name = "Feiya"
 include ':app'
 
-debug(ext.baoFolder, "AndroidStudioProjects/Bao", new String[]{"startup", "bao-library"}, "bao")
 debug(ext.yongFolder, "Projects/Yong", new String[]{"checks", "library"}, "yong")
 
 def debug(String location, String projectName, String[] modules, String subProjectName) {
