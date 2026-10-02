@@ -1,6 +1,8 @@
 import { WebHost } from "./host.js";
+import { renderMarkdown } from "./markdown.mjs";
 const host = new WebHost(
   {
+    renderMarkdown,
     fetch: (...args) => fetch(...args),
     events: (url) => new EventSource(url),
     socket: () =>

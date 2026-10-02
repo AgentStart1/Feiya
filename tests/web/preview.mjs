@@ -53,11 +53,15 @@ export async function createPreview(port = 0) {
       return;
     }
     const path =
-      { "/": "feiya/index.html", "/login": "feiya/login.html", "/messages": "feiya/chat.html" }[
-        pathname
-      ] || pathname.slice(1);
+      {
+        "/": "feiya/index.html",
+        "/login": "feiya/login.html",
+        "/messages": "feiya/chat.html",
+      }[pathname] || pathname.slice(1);
     if (
-      !/^(web\/[a-z0-9/.-]+|feiya\/(index.html|login.html|chat.html))$/.test(path) ||
+      !/^(web\/[a-z0-9/.-]+|feiya\/(index.html|login.html|chat.html))$/.test(
+        path,
+      ) ||
       path.includes("..")
     ) {
       res.writeHead(404);
@@ -68,7 +72,7 @@ export async function createPreview(port = 0) {
       const bytes = await readFile(new URL(path, root));
       const type = path.endsWith(".css")
         ? "text/css"
-        : path.endsWith(".js")
+        : path.endsWith(".js") || path.endsWith(".mjs")
           ? "text/javascript"
           : path.endsWith(".svg")
             ? "image/svg+xml"

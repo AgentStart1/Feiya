@@ -77,12 +77,14 @@ try {
     await page.getByRole("button", { name: "发送", exact: true }).isEnabled(),
     false,
   );
-  await page.getByLabel("消息内容").fill("Hello <script> & 中文");
+  await page.getByLabel("消息内容").fill("**Hello** <script> & 中文");
   await page.getByLabel("消息内容").press("Enter");
   await page
     .locator(".message p")
     .filter({ hasText: "Hello <script> & 中文" })
     .waitFor();
+  assert.equal(await page.locator(".message strong").textContent(), "Hello");
+  assert.equal(await page.locator(".message script").count(), 0);
   await page.waitForFunction(
     () => document.getElementById("input").value === "",
   );
@@ -90,7 +92,7 @@ try {
   await page.getByText("已复制消息", { exact: true }).waitFor();
   assert.equal(
     await page.evaluate(() => navigator.clipboard.readText()),
-    "Hello <script> & 中文",
+    "**Hello** <script> & 中文",
   );
   await page.evaluate(() => {
     Object.defineProperty(window, "isSecureContext", { value: false });
@@ -115,6 +117,58 @@ try {
   await page.getByRole("button", { name: "重新连接" }).click();
   await page.getByText("已连接", { exact: true }).waitFor();
   assert.equal(await page.locator(".message").count(), 1);
+  const markdown =
+    "# 消息标题\n\n**加粗**、*强调*、~~删除线~~和 `inline code`\n第二行\n\n- 第一项\n- 第二项\n\n> 引用文字\n\n[文档](https://example.com)\n\n```js\n" +
+    "const longName = 1; ".repeat(30) +
+    "\n```\n\n| 名称 | 内容 |\n| --- | --- |\n| 示例 | 值 |\n\n![文件图标](/web/icons/file.svg)";
+  await page.getByLabel("消息内容").fill(markdown);
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await page.locator(".markdown-body h1").waitFor();
+  assert.equal(await page.locator(".markdown-body table").count(), 1);
+  assert.equal(await page.locator(".markdown-body blockquote").count(), 1);
+  assert.equal(
+    await page.locator(".markdown-body a").getAttribute("rel"),
+    "noopener noreferrer",
+  );
+  assert.equal(
+    await page.locator(".markdown-body a").getAttribute("target"),
+    "_blank",
+  );
+  await page
+    .locator(".message")
+    .last()
+    .getByRole("button", { name: "复制", exact: true })
+    .click();
+  assert.equal(
+    await page.evaluate(() => navigator.clipboard.readText()),
+    markdown,
+  );
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  assert.ok(
+    await page
+      .locator(".markdown-body pre")
+      .evaluate((node) => node.scrollWidth > node.clientWidth),
+  );
+  for (const socket of preview.wss.clients)
+    socket.send(
+      JSON.stringify({
+        from: "untrusted",
+        data: '<img src=x onerror="window.injected=true"> [bad](javascript:alert%281%29)',
+        html: "<script>window.injected=true</script>",
+      }),
+    );
+  await page.getByText("untrusted", { exact: true }).waitFor();
+  assert.equal(
+    await page.locator(".message").last().locator("img,script,a").count(),
+    0,
+  );
+  assert.equal(await page.evaluate(() => window.injected), undefined);
+  assert.ok(await page.locator("#composer").evaluate(node => node.getBoundingClientRect().bottom <= innerHeight));
+
   await page.screenshot({
     path: new URL("chat-mobile.png", output).pathname,
     fullPage: true,
@@ -146,7 +200,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   console.log(
-    "PASS: desktop/mobile layout, download, SSE refresh, empty/error/retry, escaped text, chat send/copy/IME/reconnect, login error/passwordless, no page errors or external requests.",
+    "PASS: desktop/mobile layout, download, SSE refresh, empty/error/retry, escaped text, chat Markdown/raw-copy/unsafe-input/IME/reconnect, login error/passwordless, no page errors or external requests.",
   );
 } finally {
   await browser.close();

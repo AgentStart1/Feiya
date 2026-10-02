@@ -1,4 +1,5 @@
 import test from "node:test";
+import { renderMarkdown } from "../../app/src/main/resources/web/markdown.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 // Import the production Worker module without imposing a package type on Android resources.
@@ -14,6 +15,7 @@ function setup(overrides = {}) {
     effects = [],
     sockets = [];
   const io = {
+    renderMarkdown,
     fetch: async () => ({ ok: true, json: async () => [] }),
     events: () => ({ close() {} }),
     socket: () => {
@@ -133,4 +135,26 @@ test("login distinguishes invalid password and successful navigation", async () 
   assert.equal(body.get("password"), "");
   assert.equal(body.get("user"), "hidden");
   assert.deepEqual(effects, [{ type: "navigate", url: "/" }]);
+});
+
+test("socket-supplied HTML is discarded and Markdown is parsed once on receipt", () => {
+  let calls = 0;
+  const { host, sockets } = setup({
+    renderMarkdown: (text) => {
+      calls++;
+      return renderMarkdown(text);
+    },
+  });
+  host.connect();
+  sockets[0].onmessage({
+    data: JSON.stringify({
+      from: "user",
+      data: "**safe**",
+      html: "<script>bad()</script>",
+    }),
+  });
+  assert.equal(host.state.messages[0].html, "<p><strong>safe</strong></p>\n");
+  assert.equal(host.state.messages[0].data, "**safe**");
+  host.update({ error: "" });
+  assert.equal(calls, 1);
 });
