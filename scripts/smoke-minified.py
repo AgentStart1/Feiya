@@ -110,7 +110,7 @@ def main():
             if installed:
                 try:
                     (output / "services.txt").write_text(adb("shell", "dumpsys", "activity", "services", package, check=False))
-                    (output / "runtime.log").write_text(adb("logcat", "-b", "all", "-d", "-t", "4000", check=False))
+                    (output / "runtime.log").write_text(adb("logcat", "-b", "all", "-d", check=False))
                 finally:
                     try:
                         adb("shell", "am", "force-stop", package, check=False)
