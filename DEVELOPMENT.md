@@ -94,17 +94,14 @@ opens a fresh input stream for each body/range and closes it on completion or
 cancellation. HEAD requests return metadata without opening a stream. Providers
 need not supply DocumentsContract MIME/last-modified columns or seekable descriptors.
 
-`PortHandoff` serializes port changes through the service event collector. `AppServer`
-uses an injected, application-owned serial background dispatcher; its coroutine scope
-is owned by the service lifecycle. Blocking server start/stop and file IO run on IO
-workers. A new
-server and its self WebSocket must start before existing ports become redirects.
-Each retained listener redirects directly to the latest active port with HTTP 307,
-preserving host, path, query, and request method; redirects use `Cache-Control: no-store`.
-Selecting an earlier port reactivates its existing server. Stop/restart/service
-shutdown closes all retained listeners and clients. Listeners are retained only
-for the current service lifetime; they continue to occupy their ports until stopped.
-Each listener retains its server/client so it can be reactivated without rebinding.
+`ServerBinding` handles port changes serialized by the service event collector.
+`AppServer` uses an injected, application-owned serial background dispatcher; its
+coroutine scope is owned by the service lifecycle. Blocking start/stop and file IO
+run on IO workers. A replacement server and its self WebSocket must start before
+the previous server and client are closed. Successful changes release the old port;
+no retired listeners, HTTP port redirects, or SSE port-migration events are retained.
+Switching back binds a fresh server. Stop/restart/service shutdown closes the current
+listener and client.
 
 Port-switch failures preserve the active `ServerState.Started` instance, keeping its
 self WebSocket, message cache, and refresh events usable. A separate failure event
@@ -117,11 +114,11 @@ identical commands. A port change never replays a previous command. Regression t
 exercise Stop → change port → Stop and real WebSocket messaging/cache/refresh after
 a failed port switch.
 
-Index/chat pages subscribe to port-change SSE events and replace their location,
-preserving the path, query, and fragment. The shared handler is `port-change.js`.
+The file-list page retains SSE for refresh events. The chat page uses WebSocket.
+After a successful port change, users must open the new address themselves.
 
 Local tests cover provider metadata, full/range/HEAD responses, cancellation cleanup,
-port-switch failures, switching back, IPv6 redirects, and real loopback HTTP listener
+port-switch failures, switching back, old-port release, and real loopback HTTP listener
 shutdown. These are JVM/server integration tests, not Android device or Windows
 browser end-to-end tests. Recheck downloads in a Windows browser with the provider
 and file that originally reproduced issue #6 before claiming platform coverage.

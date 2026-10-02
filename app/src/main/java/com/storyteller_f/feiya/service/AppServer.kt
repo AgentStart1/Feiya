@@ -62,9 +62,7 @@ sealed interface ServerState {
         val channel: MutableSharedFlow<SseEvent>,
         val messageList: MutableStateFlow<List<Message>>,
         val time: Long,
-        val redirectPort: MutableStateFlow<Int?>,
-    ) : ServerState, PortEndpoint {
-        override fun redirectTo(port: Int?) { redirectPort.value = port }
+    ) : ServerState, BoundServer {
         override suspend fun close() {
             try { chatSession.close() } finally {
                 try { client.close() } finally {
@@ -89,7 +87,7 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
     private val scope = CoroutineScope(service.lifecycleScope.coroutineContext + coordination)
     private val context = service
     val state = MutableStateFlow<ServerState>(ServerState.Init)
-    private val ports = PortHandoff(::createServer)
+    private val ports = ServerBinding(::createServer)
     private val failures = Channel<PortSwitchFailure>(Channel.BUFFERED)
     val portSwitchFailures = failures.receiveAsFlow()
 
@@ -97,17 +95,16 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
 
     private suspend fun createServer(port: Int): ServerState.Started {
         val client = httpClient()
-        val redirectPort = MutableStateFlow<Int?>(null)
         val ready = CompletableDeferred<MutableSharedFlow<SseEvent>>()
         val server = embeddedServer(Netty, port = port, host = AppService.LISTENER_ADDRESS) {
-            ready.complete(module(context, client, redirectPort))
+            ready.complete(module(context, client))
         }
         try {
             withContext(Dispatchers.IO) { server.start(wait = false) }
             val channel = ready.await()
             val (session, messages) = withTimeoutOrNull(10_000) { setupSelfClient(port, client) }
                 ?: throw IOException("Self WebSocket connection timed out")
-            return ServerState.Started(port, server, session, client, channel, messages, System.currentTimeMillis(), redirectPort)
+            return ServerState.Started(port, server, session, client, channel, messages, System.currentTimeMillis())
         } catch (failure: Throwable) {
             withContext(Dispatchers.IO + NonCancellable) {
                 runCatching { client.close() }.exceptionOrNull()?.let(failure::addSuppressed)
@@ -258,11 +255,9 @@ class AppServer(service: AppService, private val coordination: CoroutineDispatch
 fun Application.module(
     context: Context,
     client: HttpClient,
-    redirectPort: MutableStateFlow<Int?>,
 ): MutableSharedFlow<SseEvent> {
-    installPortRedirect(redirectPort)
     plugPlugins()
-    val events = setupSse(redirectPort)
+    val events = setupSse()
     configureRouting(context)
     webSocketsService()
     setupAvatarProxy(client)

@@ -1,8 +1,8 @@
 package com.storyteller_f.feiya
 
 import com.storyteller_f.feiya.service.AppService
-import com.storyteller_f.feiya.service.PortEndpoint
-import com.storyteller_f.feiya.service.PortHandoff
+import com.storyteller_f.feiya.service.BoundServer
+import com.storyteller_f.feiya.service.ServerBinding
 import com.storyteller_f.feiya.service.collectServerEvents
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -19,28 +19,27 @@ class ServerEventsTest {
         val ports = MutableStateFlow(8080)
         val commands = Channel<Int>(Channel.UNLIMITED)
         val closed = mutableListOf<Int>()
-        val handoff = PortHandoff { port ->
-            object : PortEndpoint {
+        val binding = ServerBinding { port ->
+            object : BoundServer {
                 override val port = port
-                override fun redirectTo(port: Int?) = Unit
                 override suspend fun close() { closed.add(port) }
             }
         }
         backgroundScope.launch {
             collectServerEvents(ports, commands) { port, command ->
-                if (command == AppService.EVENT_STOP) handoff.stop() else handoff.start(port)
+                if (command == AppService.EVENT_STOP) binding.stop() else binding.start(port)
             }
         }
         runCurrent()
         commands.send(AppService.EVENT_STOP)
         runCurrent()
-        assertNull(handoff.current)
+        assertNull(binding.current)
         ports.value = 9090
         runCurrent()
-        assertEquals(9090, handoff.current!!.port)
+        assertEquals(9090, binding.current!!.port)
         commands.send(AppService.EVENT_STOP)
         runCurrent()
-        assertNull(handoff.current)
+        assertNull(binding.current)
         assertEquals(listOf(8080, 9090), closed)
     }
 
