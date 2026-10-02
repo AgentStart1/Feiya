@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -356,7 +357,7 @@ class MainActivity : ComponentActivity() {
         closeDrawer: () -> Unit,
         navigateTo: (String) -> Unit
     ) {
-        ModalDrawerSheet {
+        ModalDrawerSheet(modifier = Modifier.widthIn(max = 280.dp)) {
             Spacer(Modifier.height(12.dp))
             NavDrawer({
                 closeDrawer()
