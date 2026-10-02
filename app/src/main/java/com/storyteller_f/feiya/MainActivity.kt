@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -97,7 +98,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
-import java.io.File
 import java.lang.ref.WeakReference
 import kotlin.concurrent.thread
 
@@ -133,6 +133,13 @@ class MainActivity : ComponentActivity() {
         } else {
             NoOpBluetoothHidController()
         }
+    }
+
+    private val bootSettingsHost by lazy {
+        BootSettingsHost(
+            (application as FeiyaApplication).settingsCoordination,
+            DataStoreBootSettings(dataStore),
+        )
     }
 
     private val keyboardHost by lazy {
@@ -187,9 +194,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         bluetoothController.start()
-        if (!isUriFilePathInitialised) {
-            uriFilePath = File(filesDir, "list.txt").absolutePath
-        }
         setContent {
             val state by bluetoothController.state()
             val port by LocalContext.current.portFlow.collectAsState(initial = AppService.DEFAULT_PORT)
@@ -356,7 +360,7 @@ class MainActivity : ComponentActivity() {
         closeDrawer: () -> Unit,
         navigateTo: (String) -> Unit
     ) {
-        ModalDrawerSheet {
+        ModalDrawerSheet(modifier = Modifier.widthIn(max = 280.dp)) {
             Spacer(Modifier.height(12.dp))
             NavDrawer({
                 closeDrawer()
@@ -425,7 +429,13 @@ class MainActivity : ComponentActivity() {
             Info(i ?: 0, port.toString(), sendText)
         }
         composable("settings") {
-            SettingPage(port.toString())
+            val bootSettings by bootSettingsHost.state.collectAsStateWithLifecycle()
+            SettingPage(
+                port.toString(),
+                bootSettings,
+                bootSettingsHost::setEnabled,
+                bootSettingsHost::reload,
+            )
         }
         composable("messages") {
             Messages()
@@ -454,6 +464,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         keyboardHost.close()
+        bootSettingsHost.close()
         super.onDestroy()
         unbindService(serviceConnection)
         unbindService(chromeConnection)

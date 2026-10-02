@@ -61,4 +61,12 @@
     <string name="hid_not_connected">未连接设备</string>
     <string name="hid_connection_changed">连接已改变，任务已停止。请确认目标设备后重新发送。</string>
     <string name="hid_progress_help">进度按完成的按下/松开计数；已发送表示蓝牙接口接受了报告，不代表电脑已输入。取消不会撤回已发送的按键。</string>
+    <string name="start_on_boot">开机自启动</string>
+    <string name="start_on_boot_summary">重启手机并首次解锁后，自动启动文件共享和消息服务。关闭不会停止当前服务。</string>
+    <string name="boot_setting_error">设置读写失败，请重试</string>
+    <string name="boot_setting_loading">正在读取设置…</string>
+    <string name="boot_setting_saving">正在保存…</string>
+    <string name="boot_setting_retry">重试</string>
+    <string name="service_starting">正在启动服务…</string>
+    <string name="port_switch_failed">无法切换到端口 %1$d，服务继续使用 %2$d</string>
 </resources>

@@ -7,6 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -19,3 +20,38 @@ jobs:
 
       - name: Run tests
         run: ./gradlew test
+
+      # PR builds do not need the upstream signing secrets. Exercise R8 as well as tests.
+      - name: Build minified APKs
+        run: ./gradlew :app:assembleAlpha :app:assembleRelease
+
+      - name: Sign disposable minified APK copies
+        run: scripts/sign-smoke-apks.sh "$RUNNER_TEMP/minified-smoke" app/build/outputs/apk/alpha/app-x86_64-alpha-unsigned.apk app/build/outputs/apk/release/app-x86_64-release-unsigned.apk
+
+      - name: Release build daemon memory before emulator startup
+        run: ./gradlew --stop
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke test minified services on Android 16
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            python3 scripts/smoke-minified.py emulator-5554 "$RUNNER_TEMP/minified-smoke/alpha.apk" com.storyteller_f.feiya.alpha app/build/reports/minified-smoke/alpha
+            python3 scripts/smoke-minified.py emulator-5554 "$RUNNER_TEMP/minified-smoke/release.apk" com.storyteller_f.feiya app/build/reports/minified-smoke/release
+
+      - name: Upload minified smoke results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: minified-smoke-results
+          path: app/build/reports/minified-smoke/
+          if-no-files-found: ignore

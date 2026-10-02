@@ -34,7 +34,7 @@ val savedUriFile: MappedByteBuffer by lazy {
     } else {
         RandomAccessFile(file, "rw").channel
     }
-    channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024)
+    channel.use { it.map(FileChannel.MapMode.READ_WRITE, 0, 1024) }
 }
 
 private fun File.ensureFile(): File {
@@ -44,34 +44,35 @@ private fun File.ensureFile(): File {
     return this
 }
 
-fun Context.removeUri(path: SharedFileInfo) {
-    val file = savedUriFile
-    try {
-        val readText = file.readText()
-        val valid = readText.trim().split("\n").filter {
-            it.isNotEmpty() && it != path.uri
-        }
-        valid.joinToString("\n").let {
-            file.writeText(it)
-        }
-        contentResolver.outgoingPersistedUriPermissions.forEach {
-            if (!valid.contains(it.uri.toString())) {
-                contentResolver.releasePersistableUriPermission(
-                    path.uri.toUri(),
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
+suspend fun Context.removeUri(path: SharedFileInfo) = withContext(Dispatchers.IO) {
+    mutex.withLock {
+        val file = savedUriFile
+        try {
+            val readText = file.readText()
+            val valid = readText.trim().split("\n").filter {
+                it.isNotEmpty() && it != path.uri
+            }
+            valid.joinToString("\n").let {
+                file.writeText(it)
+            }
+            contentResolver.persistedUriPermissions.filter { it.uri.toString() == path.uri }.forEach {
+                contentResolver.releasePersistableUriPermission(it.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@removeUri, e.localizedMessage, Toast.LENGTH_LONG).show()
             }
         }
-    } catch (e: Exception) {
-        Toast.makeText(this, e.localizedMessage, Toast.LENGTH_LONG).show()
+
     }
-
-
 }
 
 private fun MappedByteBuffer.writeText(it: String) {
+    val bytes = it.toByteArray()
+    require(bytes.size < capacity()) { "Shared URI list is full" }
     position(0)
-    put(it.toByteArray() + 0)
+    put(bytes + 0)
+    force()
 }
 
 private fun MappedByteBuffer.readText(): String {
@@ -87,10 +88,11 @@ private fun MappedByteBuffer.readText(): String {
     return String(bytes, 0, index)
 }
 
-fun MappedByteBuffer.appendText(s: String) {
-    val old = readText()
-    val new = old + (if (old.isEmpty()) "" else "\n") + s
-    writeText(new)
+suspend fun MappedByteBuffer.appendText(s: String) = withContext(Dispatchers.IO) {
+    mutex.withLock {
+        val entries = (readText().lineSequence().filter { it.isNotEmpty() }.toList() + s).distinct()
+        writeText(entries.joinToString("\n"))
+    }
 }
 
 
@@ -100,7 +102,7 @@ suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
     mutex.withLock {
         val savedList = savedList()
         val savedFiles = savedFiles()
-        val value = savedFiles + savedList
+        val value = (savedFiles + savedList).distinctBy { it.uri }
         println(value.map { it.uri })
         shares.emit(value)
     }
@@ -120,7 +122,7 @@ private suspend fun Context.savedList(): List<SharedFileInfo> = withContext(Disp
     val content = buffer.readText()
     val savedList = content.split("\n").filter {
         it.isNotEmpty()
-    }.mapNotNull {
+    }.distinct().mapNotNull {
         sharedFileInfo(it)
     }
     buffer.writeText(savedList.joinToString("\n") {

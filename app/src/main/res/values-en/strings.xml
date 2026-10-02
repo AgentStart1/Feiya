@@ -56,4 +56,12 @@
     <string name="hid_not_connected">No connected device</string>
     <string name="hid_connection_changed">Connection changed; task stopped. Check the target device before sending again.</string>
     <string name="hid_progress_help">Progress counts completed press/release pairs. Sent means Bluetooth accepted the reports, not that the computer entered the text. Cancelling does not undo sent keys.</string>
+    <string name="start_on_boot">Start on boot</string>
+    <string name="start_on_boot_summary">Start file sharing and messaging after restarting and first unlocking your phone. Turning this off does not stop the current service.</string>
+    <string name="boot_setting_error">Could not read or save the setting. Please try again.</string>
+    <string name="boot_setting_loading">Loading setting…</string>
+    <string name="boot_setting_saving">Saving…</string>
+    <string name="boot_setting_retry">Retry</string>
+    <string name="service_starting">Starting service…</string>
+    <string name="port_switch_failed">Could not switch to port %1$d. Service is still running on %2$d.</string>
 </resources>

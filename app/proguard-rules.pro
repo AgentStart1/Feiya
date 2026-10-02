@@ -205,3 +205,100 @@
 -dontwarn org.osgi.annotation.bundle.Export
 
 -dontwarn com.sun.nio.file.SensitivityWatchEventModifier
+
+# Netty 4.2.17: optional desktop JFR instrumentation. PlatformDependent catches
+# missing JFR support and disables events on Android.
+-dontwarn jdk.jfr.Category
+-dontwarn jdk.jfr.Description
+-dontwarn jdk.jfr.Enabled
+-dontwarn jdk.jfr.Event
+-dontwarn jdk.jfr.FlightRecorder
+-dontwarn jdk.jfr.Label
+-dontwarn jdk.jfr.Name
+
+# Netty TLS certificate-error diagnostics use desktop LDAP name parsers.
+# Feiya's Netty listeners use plain HTTP; revisit if TLS listeners are introduced.
+-dontwarn javax.naming.ldap.LdapName
+-dontwarn javax.naming.ldap.Rdn
+
+# Ktor passes Channel class literals to Netty's ReflectiveChannelFactory, which
+# calls Class.getConstructor(). Keep the public no-arg constructors, not all Netty.
+-keepclassmembers,allowoptimization class io.netty.channel.** implements io.netty.channel.Channel {
+    public <init>();
+}
+
+# ResourceLeakDetector.addExclusions checks declared method names at class init.
+# Retain the methods as well as their names, including currently unused overloads.
+-keepclassmembers class io.netty.buffer.AbstractByteBufAllocator {
+    *** toLeakAwareBuffer(...);
+}
+-keepclassmembers class io.netty.buffer.AdvancedLeakAwareByteBuf {
+    *** touch(...);
+    *** recordLeakNonRefCountingOperation(...);
+}
+-keepclassmembers class io.netty.util.ReferenceCountUtil {
+    *** touch(...);
+}
+
+# Android takes Netty's non-VarHandle path; MethodHandles.Lookup.findStatic uses
+# this literal method name, which R8 does not infer through Netty's cls() helper.
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap {
+    private static void acquireFenceFallback();
+    private volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index head;
+}
+# The same cls() helper hides the field-updater targets from R8. Preserve their
+# exact names/types and volatility; optimized APKs otherwise retain stale names.
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Node {
+    volatile java.lang.Object val;
+    volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Node next;
+}
+-keepclassmembers class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index {
+    volatile io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$Index right;
+}
+
+# assets/logback.xml instantiates this class by name. Logback's XML configurator
+# also discovers bean properties and converter constructors reflectively.
+-keep class ch.qos.logback.classic.android.LogcatAppender {
+    public <init>();
+}
+-keepclassmembers class ch.qos.logback.** { *; }
+-keepattributes Signature
+
+# TypeParameterMatcher walks generic superclasses at runtime (including Ktor's
+# NettyDirectEncoder during WebSocket upgrade). Keep class structure/signatures;
+# unused classes may still shrink and names/members may still be obfuscated.
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToByteEncoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToByteEncoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageEncoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageEncoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageDecoder
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageDecoder
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.MessageToMessageCodec
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.MessageToMessageCodec
+-keep,allowshrinking,allowobfuscation class io.netty.handler.codec.ByteToMessageCodec
+-keep,allowshrinking,allowobfuscation class * extends io.netty.handler.codec.ByteToMessageCodec
+-keep,allowshrinking,allowobfuscation class io.netty.channel.SimpleChannelInboundHandler
+-keep,allowshrinking,allowobfuscation class * extends io.netty.channel.SimpleChannelInboundHandler
+-keep,allowshrinking,allowobfuscation class io.netty.channel.SimpleUserEventChannelHandler
+-keep,allowshrinking,allowobfuscation class * extends io.netty.channel.SimpleUserEventChannelHandler
+-keep,allowshrinking,allowobfuscation class io.netty.resolver.AbstractAddressResolver
+-keep,allowshrinking,allowobfuscation class * extends io.netty.resolver.AbstractAddressResolver
+
+# Netty inspects @Sharable through the handler's class hierarchy and @Skip via
+# getMethod(name, ...). Full-mode R8 needs explicit targets as well as attributes.
+-keep,allowobfuscation @interface io.netty.channel.ChannelHandler$Sharable
+-keep,allowshrinking,allowobfuscation @io.netty.channel.ChannelHandler$Sharable class *
+-keep,allowobfuscation @interface io.netty.channel.ChannelHandlerMask$Skip
+-keepclassmembers class * implements io.netty.channel.ChannelHandler {
+    public void channel*(...);
+    public void exceptionCaught(...);
+    public void userEventTriggered(...);
+    public void bind(...);
+    public void connect(...);
+    public void disconnect(...);
+    public void close(...);
+    public void deregister(...);
+    public void read(...);
+    public void write(...);
+    public void flush(...);
+}

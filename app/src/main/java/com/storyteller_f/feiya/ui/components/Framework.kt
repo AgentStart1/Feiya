@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,6 +46,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
+import com.storyteller_f.feiya.BootSettingsState
 import com.storyteller_f.feiya.R
 import com.storyteller_f.feiya.dataStore
 import com.storyteller_f.feiya.service.AppService
@@ -181,8 +187,16 @@ fun MainToolbar(
 @Preview
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-fun SettingPage(port: String = AppService.DEFAULT_PORT.toString()) {
+fun SettingPage(
+    port: String = AppService.DEFAULT_PORT.toString(),
+    bootSettings: BootSettingsState = BootSettingsState(),
+    setStartOnBoot: (Boolean) -> Unit = {},
+    retryBootSettings: () -> Unit = {},
+) {
     PrefsScreen(dataStore = LocalContext.current.dataStore) {
+        prefsItem {
+            BootPreference(bootSettings, setStartOnBoot, retryBootSettings)
+        }
         prefsItem {
             EditTextPref(
                 key = "port",
@@ -192,6 +206,41 @@ fun SettingPage(port: String = AppService.DEFAULT_PORT.toString()) {
                 dialogMessage = stringResource(R.string.please_input_a_valid_port),
                 defaultValue = AppService.DEFAULT_PORT.toString()
             )
+        }
+    }
+}
+
+@Composable
+fun BootPreference(state: BootSettingsState, onToggle: (Boolean) -> Unit, onRetry: () -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().toggleable(
+                value = state.enabled,
+                enabled = !state.loading && !state.saving,
+                role = Role.Switch,
+                onValueChange = onToggle,
+            ).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(stringResource(R.string.start_on_boot), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(when {
+                        state.error -> R.string.boot_setting_error
+                        state.loading -> R.string.boot_setting_loading
+                        state.saving -> R.string.boot_setting_saving
+                        else -> R.string.start_on_boot_summary
+                    }),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (state.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = state.enabled, onCheckedChange = null, enabled = !state.loading && !state.saving)
+        }
+        if (state.error && state.loading) {
+            TextButton(onClick = onRetry, modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(stringResource(R.string.boot_setting_retry))
+            }
         }
     }
 }

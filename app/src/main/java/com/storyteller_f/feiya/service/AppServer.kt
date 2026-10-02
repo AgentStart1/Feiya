@@ -33,29 +33,44 @@ import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.copyAndClose
 import io.ktor.websocket.close
 import io.ktor.websocket.send
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import java.lang.ref.WeakReference
 import kotlin.time.Duration.Companion.seconds
-
-var channelWaitWorker: CompletableDeferred<MutableSharedFlow<SseEvent>>? = null
 
 sealed interface ServerState {
     data object Init : ServerState
     class Started(
-        val port: Int,
+        override val port: Int,
         val server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>,
         val chatSession: DefaultClientWebSocketSession,
         val client: HttpClient,
         val channel: MutableSharedFlow<SseEvent>,
         val messageList: MutableStateFlow<List<Message>>,
-        val time: Long
-    ) : ServerState
+        val time: Long,
+    ) : ServerState, BoundServer {
+        override suspend fun close() {
+            try { chatSession.close() } finally {
+                try { client.close() } finally {
+                    withContext(Dispatchers.IO) { server.stop() }
+                }
+            }
+        }
+    }
 
     data class Stopped(val reason: String) : ServerState
 
@@ -66,52 +81,49 @@ sealed interface ServerState {
     }
 }
 
-class AppServer(service: AppService) {
-    private val scope = service.lifecycleScope
+data class PortSwitchFailure(val requestedPort: Int, val activePort: Int, val cause: Throwable)
+
+class AppServer(service: AppService, private val coordination: CoroutineDispatcher) {
+    private val scope = CoroutineScope(service.lifecycleScope.coroutineContext + coordination)
     private val context = service
     val state = MutableStateFlow<ServerState>(ServerState.Init)
+    private val ports = ServerBinding(::createServer)
+    private val failures = Channel<PortSwitchFailure>(Channel.BUFFERED)
+    val portSwitchFailures = failures.receiveAsFlow()
 
     val messagesCache get() = (state.value as? ServerState.Started)?.messageList?.asStateFlow()
 
-    private suspend fun startInternal(port: Int) {
-        Log.d(TAG, "startInternal() called")
+    private suspend fun createServer(port: Int): ServerState.Started {
+        val client = httpClient()
+        val ready = CompletableDeferred<MutableSharedFlow<SseEvent>>()
+        val server = embeddedServer(Netty, port = port, host = AppService.LISTENER_ADDRESS) {
+            ready.complete(module(context, client))
+        }
         try {
-            val client = httpClient()
-            val (server, channel) = setupServer(port, client)
-            val (session, messageFlow) = setupSelfClient(port, client)
-            val time = System.currentTimeMillis()
-            state.value = ServerState.Started(
-                port,
-                server,
-                session,
-                client,
-                channel,
-                messageFlow,
-                time
-            )
-            Log.i(TAG, "startInternal: $time")
-        } catch (th: Throwable) {
-            Log.e(TAG, "startInternal: ${th.localizedMessage}", th)
-            emitErrorState(th)
+            withContext(Dispatchers.IO) { server.start(wait = false) }
+            val channel = ready.await()
+            val (session, messages) = withTimeoutOrNull(10_000) { setupSelfClient(port, client) }
+                ?: throw IOException("Self WebSocket connection timed out")
+            return ServerState.Started(port, server, session, client, channel, messages, System.currentTimeMillis())
+        } catch (failure: Throwable) {
+            withContext(Dispatchers.IO + NonCancellable) {
+                runCatching { client.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+                runCatching { server.stop() }.exceptionOrNull()?.let(failure::addSuppressed)
+            }
+            throw failure
         }
     }
 
-    private suspend fun setupServer(
-        port: Int,
-        client: HttpClient
-    ): Pair<EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>, MutableSharedFlow<SseEvent>> {
-        channelWaitWorker = CompletableDeferred()
-        clientRef = WeakReference(client)
-        contextRef = WeakReference(context)
-        return embeddedServer(
-            Netty,
-            port = port,
-            host = AppService.LISTENER_ADDRESS,
-        ) {
-            module()
-        }.start(wait = false) to channelWaitWorker!!.await()
+    private suspend fun startInternal(port: Int) {
+        try {
+            state.value = ports.start(port)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Log.e(TAG, "Unable to start requested server port", failure)
+            reportStartFailure(port, failure)
+        }
     }
-
 
     private suspend fun setupSelfClient(
         port: Int,
@@ -121,23 +133,30 @@ class AppServer(service: AppService) {
         val messagesCache = MutableStateFlow<List<Message>>(emptyList())
         val sessionWaitWorker = CompletableDeferred<DefaultClientWebSocketSession>()
         scope.launch {
-            client.webSocket(
-                method = HttpMethod.Get,
-                host = "127.0.0.1",
-                port = port,
-                path = "/chat"
-            ) {
-                sessionWaitWorker.complete(this)
-                try {
+            try {
+                client.webSocket(
+                    method = HttpMethod.Get,
+                    host = "127.0.0.1",
+                    port = port,
+                    path = "/chat"
+                ) {
+                    sessionWaitWorker.complete(this)
                     while (true) {
-                        val receiveDeserialized = receiveDeserialized<Message>()
-                        messagesCache.value = messagesCache.value.plus(receiveDeserialized)
+                        val message = receiveDeserialized<Message>()
+                        messagesCache.value = messagesCache.value + message
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "startInternal: self webSocket", e)
+                }
+            } catch (cancelled: CancellationException) {
+                sessionWaitWorker.completeExceptionally(cancelled)
+                throw cancelled
+            } catch (failure: Exception) {
+                sessionWaitWorker.completeExceptionally(failure)
+                Log.e(TAG, "Self WebSocket ended", failure)
+            } finally {
+                if (!sessionWaitWorker.isCompleted) {
+                    sessionWaitWorker.completeExceptionally(IllegalStateException("Self WebSocket closed before connecting"))
                 }
             }
-            Log.i(TAG, "startInternal: self webSocket end")
         }
         return (sessionWaitWorker.await() to messagesCache)
     }
@@ -152,67 +171,24 @@ class AppServer(service: AppService) {
     }
 
     private suspend fun stopInternal(cause: String) {
-        Log.d(TAG, "stopInternal() called")
-        val serverState = state.value
-        if (serverState is ServerState.Started) {
-            serverState.chatSession.close()
-            serverState.client.close()
-            serverState.server.stop()
-            state.value = ServerState.Stopped(cause)
+        try { ports.stop() } finally { state.value = ServerState.Stopped(cause) }
+    }
+
+    private suspend fun stopIfNeed(cause: String) = stopInternal(cause)
+
+    private suspend fun startIfNeed(port: Int) = startInternal(port)
+
+    private suspend fun reportStartFailure(port: Int, cause: Throwable) {
+        val active = ports.current
+        if (active == null) {
+            state.value = ServerState.Error(cause)
+        } else {
+            state.value = active
+            failures.send(PortSwitchFailure(port, active.port, cause))
         }
     }
 
-
-    private suspend fun stopIfNeed(cause: String) {
-        when (state.value) {
-            is ServerState.Started -> {
-                stopInternal(cause)
-            }
-
-            is ServerState.Init -> {
-                return
-            }
-
-            is ServerState.Error -> {
-                return
-            }
-
-            is ServerState.Stopped -> {
-                return
-            }
-        }
-    }
-
-    private suspend fun startIfNeed(port: Int) {
-        when (val current = state.value) {
-            is ServerState.Started -> {
-                if (current.port == port) {
-                    return
-                } else {
-                    stopInternal("port changed")
-                    startInternal(port)
-                }
-            }
-
-            is ServerState.Init -> {
-                startInternal(port)
-            }
-
-            is ServerState.Error -> {
-                startInternal(port)
-            }
-
-            is ServerState.Stopped -> {
-                startInternal(port)
-            }
-        }
-    }
-
-    private fun emitErrorState(cause: Throwable) {
-        state.value = ServerState.Error(cause)
-    }
-
-    suspend fun onReceiveEventPort(port: Int, event: Int?) {
+    suspend fun onReceiveEventPort(port: Int, event: Int?) = withContext(coordination) {
         if (event != null) {
             when (event) {
                 AppService.EVENT_STOP -> {
@@ -228,15 +204,14 @@ class AppServer(service: AppService) {
             }
         } else {
             when {
-                port > AppService.VALID_PORT -> {
+                port in (AppService.VALID_PORT + 1)..65535 -> {
                     //start server
                     startIfNeed(port)
                 }
 
                 else -> {
-                    stopIfNeed("invalid port")
                     val cause = IllegalAccessException("invalid port $port")
-                    emitErrorState(cause)
+                    reportStartFailure(port, cause)
                 }
             }
         }
@@ -245,9 +220,8 @@ class AppServer(service: AppService) {
 
 
     fun stopBlocking() {
-        runBlocking {
-            stopInternal("service stopped")
-        }
+        // Android's onDestroy is synchronous; join cleanup before returning to the framework.
+        runBlocking { withContext(coordination) { stopInternal("service stopped") } }
     }
 
     suspend fun sendMessage(content: String) {
@@ -278,17 +252,16 @@ class AppServer(service: AppService) {
     }
 }
 
-var contextRef: WeakReference<out Context>? = null
-var clientRef: WeakReference<HttpClient>? = null
-
-fun Application.module() {
-    val context = contextRef?.get()!!
-    val client = clientRef?.get()!!
+fun Application.module(
+    context: Context,
+    client: HttpClient,
+): MutableSharedFlow<SseEvent> {
     plugPlugins()
-    channelWaitWorker?.complete(setupSse())
+    val events = setupSse()
     configureRouting(context)
     webSocketsService()
     setupAvatarProxy(client)
+    return events
 }
 
 private val avatarPattern = Regex("/avatar/(\\w+).png")
