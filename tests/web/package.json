@@ -1,0 +1,14 @@
+{
+  "name": "feiya-web-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test host.test.mjs",
+    "test:browser": "node browser.test.mjs",
+    "preview": "node preview.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "ws": "8.22.0"
+  }
+}

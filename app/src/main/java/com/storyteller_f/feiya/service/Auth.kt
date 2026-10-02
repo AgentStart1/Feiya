@@ -14,6 +14,9 @@ import io.ktor.server.auth.session
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.post
+import io.ktor.server.routing.get
+import io.ktor.server.response.respondResource
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
@@ -54,6 +57,9 @@ fun Application.configureRouting(context: Context) {
         }
     }
     routing {
+        // Login and its local UI assets must be reachable before a session exists.
+        get("/login") { call.respondResource("feiya/login.html") }
+        staticResources("/web", "web")
         authenticate {
             post("/login") {
                 println("post login")
@@ -62,6 +68,8 @@ fun Application.configureRouting(context: Context) {
             }
         }
         authenticate("auth-session") {
+            get("/") { call.respondResource("feiya/index.html") }
+            get("/messages") { call.respondResource("feiya/chat.html") }
             contentRoute(context)
         }
 

@@ -201,3 +201,39 @@ URI, which is the Compose list key. Instrumented tests create unique temporary f
 fixtures, wait for asynchronous additions, and remove only their own entries/files
 in `@After`; they must not append permanent `file:///test.zip` entries. SSE assertions
 have a timeout and propagate failures instead of swallowing them.
+
+## Shared browser UI
+
+The production pages live in `app/src/main/resources/feiya`: `index.html`, `login.html`,
+and `chat.html`. Shared styles, JavaScript, and icons live in the sibling `web/` directory.
+The page namespace avoids collisions with dependency resources such as `index.html`.
+Ktor serves
+`/login` and `/web/*` before authentication, and `/` and `/messages` after session
+validation. `/shares`, `/shares/{index}`, `/sse`, and `/chat` retain their existing
+protocols. File downloads still use server list indices.
+
+`web/host.js` owns asynchronous feature state and effects without DOM dependencies.
+`web/worker.js` injects browser networking and timers in one dedicated Worker per
+page. `web/app.js` renders snapshots and owns the immediately updated text draft.
+Page exit terminates the Worker; a back/forward cache restore starts a fresh Host.
+Messages are not automatically replayed after disconnect. Clipboard copying uses
+the secure-context API when available and a user-gesture fallback for LAN HTTP.
+
+Run the isolated web checks with Node.js 22 or later:
+
+```sh
+npm ci --prefix tests/web
+npm --prefix tests/web test
+npm --prefix tests/web exec -- playwright install --with-deps chromium
+npm --prefix tests/web run test:browser
+npm --prefix tests/web run preview
+```
+
+The preview runs on `127.0.0.1:4173` with mock HTTP/SSE/WebSocket data; it is not an
+Android end-to-end test. Browser tests save desktop/mobile screenshots to ignored
+`tests/web/artifacts/`. `WebPagesTest` separately checks the real Ktor routes,
+authentication redirects, login, and bundled assets using a JVM server.
+
+Icons are vendored from [Phosphor Icons core 2.1.1](https://github.com/phosphor-icons/core)
+under its MIT license (`web/icons/LICENSE`). They need no runtime package or CDN.
+Use upstream SVG assets when adding icons and retain the license.

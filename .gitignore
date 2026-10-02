@@ -11,3 +11,6 @@ local.properties
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/deploymentTargetDropDown.xml
 .kotlin
+# Browser development tools and screenshots
+/tests/web/node_modules/
+/tests/web/artifacts/
