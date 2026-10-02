@@ -5,6 +5,7 @@ directory (or configure `sdk.dir` in your local `local.properties`).
 
 ```sh
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew :app:assembleAlpha :app:assembleRelease
 ./gradlew :app:lintDebug
 ```
 
@@ -134,3 +135,16 @@ Local tests cover preference persistence, Host errors/cancellation, switch rende
 boot gating, timeout and denied-start cleanup, manifest receiver delivery, and foreground
 promotion without notification permission. Actual reboot and manufacturer autostart
 restrictions require device testing and remain unverified in this environment.
+
+## Minified builds
+
+PR CI assembles both Alpha and Release without signing secrets, in addition to tests.
+Debug does not run R8 and cannot detect missing-class failures in these variants.
+Local builds without the release signing environment variables produce unsigned APKs.
+
+Netty 4.2.17 references desktop-only JFR classes and LDAP name parsers. The narrow
+`-dontwarn` rules in `app/proguard-rules.pro` cover only the reported classes:
+Netty detects unavailable JFR at runtime, and its LDAP references belong to TLS
+certificate-error diagnostics unused by Feiya's plain HTTP Netty listeners. These
+rules do not add desktop APIs to Android or disable certificate verification. Recheck
+them when upgrading Netty or adding TLS listeners; do not suppress all R8 warnings.

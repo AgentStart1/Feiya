@@ -19,3 +19,7 @@ jobs:
 
       - name: Run tests
         run: ./gradlew test
+
+      # PR builds do not need the upstream signing secrets. Exercise R8 as well as tests.
+      - name: Build minified APKs
+        run: ./gradlew :app:assembleAlpha :app:assembleRelease

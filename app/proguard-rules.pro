@@ -205,3 +205,18 @@
 -dontwarn org.osgi.annotation.bundle.Export
 
 -dontwarn com.sun.nio.file.SensitivityWatchEventModifier
+
+# Netty 4.2.17: optional desktop JFR instrumentation. PlatformDependent catches
+# missing JFR support and disables events on Android.
+-dontwarn jdk.jfr.Category
+-dontwarn jdk.jfr.Description
+-dontwarn jdk.jfr.Enabled
+-dontwarn jdk.jfr.Event
+-dontwarn jdk.jfr.FlightRecorder
+-dontwarn jdk.jfr.Label
+-dontwarn jdk.jfr.Name
+
+# Netty TLS certificate-error diagnostics use desktop LDAP name parsers.
+# Feiya's Netty listeners use plain HTTP; revisit if TLS listeners are introduced.
+-dontwarn javax.naming.ldap.LdapName
+-dontwarn javax.naming.ldap.Rdn
