@@ -226,3 +226,16 @@
 -keepclassmembers,allowoptimization class io.netty.channel.** implements io.netty.channel.Channel {
     public <init>();
 }
+
+# ResourceLeakDetector.addExclusions checks declared method names at class init.
+# Retain the methods as well as their names, including currently unused overloads.
+-keepclassmembers class io.netty.buffer.AbstractByteBufAllocator {
+    *** toLeakAwareBuffer(...);
+}
+-keepclassmembers class io.netty.buffer.AdvancedLeakAwareByteBuf {
+    *** touch(...);
+    *** recordLeakNonRefCountingOperation(...);
+}
+-keepclassmembers class io.netty.util.ReferenceCountUtil {
+    *** touch(...);
+}

@@ -166,6 +166,9 @@ Netty's `ReflectiveChannelFactory` invokes public no-argument Channel constructo
 Keep these constructors for live `io.netty.channel` implementations; `-dontwarn` does
 not preserve reflective entry points. Class names and unrelated members can still
 be optimized. Assemble success alone is not evidence that a minified app starts.
+`ResourceLeakDetector.addExclusions` also checks declared method names during class
+initialization. Keep the named allocator/leak-aware buffer/reference-count utility
+methods in the rules; renaming or removing them causes an initialization crash.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
