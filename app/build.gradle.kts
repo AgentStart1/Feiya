@@ -3,9 +3,9 @@ import java.io.FileWriter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.starter.easylauncher") version "6.4.1"
+    alias(libs.plugins.android)
+    alias(libs.plugins.serialization)
+    alias(libs.plugins.easylauncher)
     alias(libs.plugins.compose.compiler)
 }
 

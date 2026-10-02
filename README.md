@@ -36,3 +36,5 @@ a computer is connected, regardless of its Bluetooth name:
 Calibration sends physical keys directly and is unaffected by the text layout selection.
 ISO calibration does not add international text layouts; text mapping still uses the
 selected US QWERTY, Dvorak, or Colemak layout.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build and test instructions.

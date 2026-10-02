@@ -14,6 +14,7 @@ customview-poolingcontainer = "1.1.0"
 customview = "1.2.0"
 datastore-preferences = "1.1.1"
 espresso-core = "3.7.0"
+easylauncher = "6.4.1"
 junit = "4.13.2"
 kotlinx-coroutines = "1.11.0"
 ktor-client = "3.6.0"
@@ -97,6 +98,7 @@ ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
 ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging", "ktor-client-core"]
 
 [plugins]
+easylauncher = { id = "com.starter.easylauncher", version.ref = "easylauncher" }
 android = { id = "com.android.application", version.ref = "agp" }
 kotlin = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "serialization" }
