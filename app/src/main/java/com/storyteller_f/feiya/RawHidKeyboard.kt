@@ -8,7 +8,12 @@ import kotlinx.coroutines.sync.withLock
 class RawHidKeyboard(private val pause: suspend (Long) -> Unit = { delay(it) }) {
     private val mutex = Mutex()
 
-    suspend fun sendRawKey(key: HidKey, report: (ByteArray) -> Boolean): Boolean = mutex.withLock {
+    suspend fun sendRawKey(
+        key: HidKey,
+        canSend: () -> Boolean = { true },
+        report: (ByteArray) -> Boolean,
+    ): Boolean = mutex.withLock {
+        if (!canSend()) return@withLock false
         val released: Boolean
         val pressed = try {
             report(byteArrayOf(key.modifier.toByte(), key.usage.toByte())).also {

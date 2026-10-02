@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -14,23 +15,30 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HidKeyboardHostTest {
+    private fun host(dispatcher: kotlinx.coroutines.CoroutineDispatcher, send: suspend (HidKey) -> Boolean): HidKeyboardHost =
+        HidKeyboardHost(dispatcher, MutableStateFlow(object : HidKeyboardConnection {
+            override val deviceName = "computer"
+            override val isConnected = true
+            override suspend fun sendRawKey(key: HidKey) = if (send(key)) HidKeyResult.SENT else HidKeyResult.FAILED
+        }))
+
     @Test fun unsupportedTextSendsNothingAndLaterTextStillWorks() = runTest {
         val sent = mutableListOf<HidKey>()
         val effects = mutableListOf<HidKeyboardEffect>()
-        val host = HidKeyboardHost(StandardTestDispatcher(testScheduler)) { sent.add(it); true }
+        val host = host(StandardTestDispatcher(testScheduler)) { sent.add(it); true }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { host.effects.collect { effects.add(it) } }
         host.sendText("valid prefix then 😀")
         host.sendText("A")
         advanceUntilIdle()
         assertEquals(listOf(HidKey(4, 2)), sent)
-        assertEquals(listOf(HidKeyboardEffect.UNSUPPORTED_TEXT), effects)
+        assertEquals(listOf(HidKeyboardEffect.UNSUPPORTED_TEXT, HidKeyboardEffect.SENT), effects)
         host.close()
     }
 
     @Test fun transportFailureStopsCurrentTextButKeepsConsumerAlive() = runTest {
         val sent = mutableListOf<HidKey>()
         val effects = mutableListOf<HidKeyboardEffect>()
-        val host = HidKeyboardHost(StandardTestDispatcher(testScheduler)) {
+        val host = host(StandardTestDispatcher(testScheduler)) {
             sent.add(it)
             if (it.usage == 4) throw SecurityException("permission revoked")
             it.usage != 5
@@ -41,14 +49,14 @@ class HidKeyboardHostTest {
         host.sendText("d")
         advanceUntilIdle()
         assertEquals(listOf(HidKey(4), HidKey(5), HidKey(7)), sent)
-        assertEquals(listOf(HidKeyboardEffect.SEND_FAILED, HidKeyboardEffect.SEND_FAILED), effects)
+        assertEquals(listOf(HidKeyboardEffect.SEND_FAILED, HidKeyboardEffect.SEND_FAILED, HidKeyboardEffect.SENT), effects)
         host.close()
     }
 
     @Test fun calibrationAndShortcutsBypassEveryTextLayout() = runTest {
         for (layout in TargetKeyboardLayout.entries) {
             val sent = mutableListOf<HidKey>()
-            val host = HidKeyboardHost(StandardTestDispatcher(testScheduler)) { sent.add(it); true }
+            val host = host(StandardTestDispatcher(testScheduler)) { sent.add(it); true }
             host.selectLayout(layout)
             host.sendLeftCalibrationKey()
             host.sendRightCalibrationKey()
@@ -66,27 +74,25 @@ class HidKeyboardHostTest {
 
     @Test fun queuedTextKeepsItsLayoutAndMessagesDoNotInterleave() = runTest {
         val sent = mutableListOf<HidKey>()
-        val host = HidKeyboardHost(StandardTestDispatcher(testScheduler)) {
+        val host = host(StandardTestDispatcher(testScheduler)) {
             delay(100)
             sent.add(it)
             true
         }
         host.selectLayout(TargetKeyboardLayout.DVORAK)
-        host.editContent("ee")
-        host.sendContent()
+        host.sendText("ee")
         host.selectLayout(TargetKeyboardLayout.COLEMAK)
         host.sendText("e")
         assertEquals(HidKeyboardState(), host.state.value) // Mutations use the injected dispatcher.
         advanceUntilIdle()
         assertEquals(listOf(HidKey(7), HidKey(7), HidKey(0x0e)), sent)
-        assertEquals("ee", host.state.value.content)
         host.close()
     }
 
     @Test fun closingHostCancelsActiveSendAndDiscardsPendingWork() = runTest {
         val sent = mutableListOf<HidKey>()
         val cancelled = mutableListOf<HidKey>()
-        val host = HidKeyboardHost(StandardTestDispatcher(testScheduler)) {
+        val host = host(StandardTestDispatcher(testScheduler)) {
             sent.add(it)
             try { delay(1000) } catch (error: CancellationException) { cancelled.add(it); throw error }
             true

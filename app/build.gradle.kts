@@ -88,6 +88,10 @@ android {
         resValues = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             excludes += ("/META-INF/{AL2.0,LGPL2.1}")
@@ -145,6 +149,8 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.ui.test.junit4)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)

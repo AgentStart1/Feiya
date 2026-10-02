@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
     private val keyboardHost by lazy {
         HidKeyboardHost(
             (application as FeiyaApplication).keyboardCoordination,
-            bluetoothController::sendRawKey,
+            bluetoothController.keyboardConnection,
         )
     }
 
@@ -209,9 +209,11 @@ class MainActivity : ComponentActivity() {
                         val message = when (effect) {
                             HidKeyboardEffect.UNSUPPORTED_TEXT -> R.string.hid_unsupported_text
                             HidKeyboardEffect.SEND_FAILED -> R.string.hid_send_failed
+                            HidKeyboardEffect.CONNECTION_CHANGED -> R.string.hid_connection_changed
+                            HidKeyboardEffect.SENT -> R.string.hid_task_sent
                         }
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        if (effect == HidKeyboardEffect.SEND_FAILED) {
+                        if (effect == HidKeyboardEffect.SEND_FAILED || effect == HidKeyboardEffect.CONNECTION_CHANGED) {
                             navController.navigate("hid") { launchSingleTop = true }
                         }
                     }
@@ -436,8 +438,8 @@ class MainActivity : ComponentActivity() {
                 connectDevice = bluetoothController::connectDevice,
                 sendText = sendText,
                 keyboardState = keyboardState,
-                editContent = keyboardHost::editContent,
-                sendContent = keyboardHost::sendContent,
+                cancelTask = keyboardHost::cancelTask,
+                cancelAll = keyboardHost::cancelAll,
                 selectLayout = keyboardHost::selectLayout,
                 selectCalibration = keyboardHost::selectCalibration,
                 sendLeftCalibrationKey = keyboardHost::sendLeftCalibrationKey,

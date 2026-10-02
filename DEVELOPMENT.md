@@ -30,21 +30,31 @@ the app's other dependencies already require a compatible version.
 
 ## HID keyboard
 
-`HidKeyboardHost` owns text, target layout, calibration selection, and a sequential
-send queue. The activity creates and closes it, observes state with lifecycle-aware
-Compose collection, and consumes its error effects while started. The application
+`HidKeyboardHost` owns target layout, calibration selection, and a sequential
+send queue with observable task status, key progress, failure reasons, and cancellation.
+The HID screen owns a saveable `TextFieldValue` draft and updates it synchronously
+in `onValueChange`; submission passes an immutable text snapshot to the Host.
+Background task updates never replace the draft, cursor, or IME composition. The activity creates and closes it, observes state with lifecycle-aware
+Compose collection, and consumes its completion/error effects while started. The application
 injects a serial background coroutine dispatcher; host tests inject a test dispatcher.
 
 Text is fully mapped before enqueueing, so unsupported characters cannot produce a
-partial send. Each queued message captures its selected layout. `KeyboardLayout`
+partial send. Each queued message captures its selected layout. The connection handle is captured
+synchronously at submission, before dispatching queue work. Handle identity and
+validity are checked before and after every key; reconnecting to the same device
+creates a new handle. Finished task history is bounded to ten entries. `KeyboardLayout`
 maps characters directly to `HidKey(usage, modifier)` using physical US key positions.
 There are no string interceptors. `sendText` on the Host is the convenience entry
 point for both the HID screen and shared URLs.
 
 All output, including calibration and modifier combinations, calls
-`BluetoothHidController.sendRawKey`. `RawHidKeyboard` serializes press/release pairs
+a bound `HidKeyboardSession`. The controller publishes connection handles and
+invalidates them on disconnect, service loss, unregistration, Bluetooth shutdown,
+permission loss, and activity destruction. `RawHidKeyboard` serializes press/release pairs
 and attempts a release even on failure or cancellation. Bluetooth calls run on the
-IO dispatcher; connection state is captured on the main thread. Keyboard report ID 2
+IO dispatcher; each session captures one Bluetooth device and profile on the main
+thread. Validity is checked again after acquiring the keyboard mutex; key release
+always uses the original target. Keyboard report ID 2
 has exactly two bytes: modifier mask and one key usage, as defined in
 `app/src/main/assets/hid`. Do not replace this with an eight-byte boot keyboard report.
 Shortcuts can combine modifiers with one key; multiple simultaneous non-modifier keys
@@ -55,7 +65,11 @@ Mapping references: [USB HID Usage Tables](https://www.usb.org/hid) and the
 
 The JVM tests cover ASCII/layout translation, unsupported input, queued-message
 ordering, failure recovery, layout-independent calibration, report bytes, and
-cancellation cleanup. Real-device HID end-to-end testing is currently deferred.
+cancellation cleanup, session replacement, queue cancellation, and task progress.
+Robolectric Compose tests run locally with Android resources and verify immediate
+draft edits across task updates/reconnection, plus visible progress and cancellation
+controls after disconnecting. They run as part of `:app:testDebugUnitTest` and do not
+require an emulator. Real-device HID end-to-end testing is currently deferred.
 When resumed, it requires a Bluetooth HID-capable Android device meeting the minimum
 version in [README.md](README.md) and a target computer. The validation checklist is:
 

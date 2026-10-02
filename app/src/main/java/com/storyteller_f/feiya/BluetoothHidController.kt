@@ -27,7 +27,9 @@ import androidx.lifecycle.LifecycleOwner
 import com.storyteller_f.feiya.ui.components.ComposeBluetoothDevice
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.lang.ref.WeakReference
 
 interface BluetoothHidController {
@@ -37,7 +39,7 @@ interface BluetoothHidController {
 
     fun disconnectDevice(address: String): Boolean
 
-    suspend fun sendRawKey(key: HidKey): Boolean
+    val keyboardConnection: StateFlow<HidKeyboardConnection?>
 
     fun start()
 
@@ -52,7 +54,7 @@ class NoOpBluetoothHidController : BluetoothHidController {
     override fun connectDevice(address: String) = false
     override fun disconnectDevice(address: String) = false
 
-    override suspend fun sendRawKey(key: HidKey) = false
+    override val keyboardConnection = MutableStateFlow<HidKeyboardConnection?>(null).asStateFlow()
     override fun start() = Unit
 
     @Composable
@@ -80,6 +82,8 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
     private var bluetoothPermissionIndex by mutableIntStateOf(0)
 
     private val keyboard = RawHidKeyboard()
+    private val connectionState = MutableStateFlow<HidKeyboardSession?>(null)
+    override val keyboardConnection: StateFlow<HidKeyboardConnection?> = connectionState.asStateFlow()
     private var connectedDevice by mutableStateOf<BluetoothDevice?>(null)
     private var connecting by mutableStateOf<String?>(null)
 
@@ -92,6 +96,7 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
             Log.d(TAG, "onServiceConnected() called with: p0 = $p0, p1 = $p1 $hidRegistered")
             if (p0 == BluetoothProfile.HID_DEVICE && p1 != null) {
                 val bluetoothHidDevice = p1 as BluetoothHidDevice
+                if (hidDevice !== bluetoothHidDevice) clearConnection()
                 hidDevice = bluetoothHidDevice
                 if (!hidRegistered) {
                     context.get()?.registerAsHid(bluetoothHidDevice, registerCallback)
@@ -101,6 +106,11 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
 
         override fun onServiceDisconnected(p0: Int) {
             Log.d(TAG, "onServiceDisconnected() called with: p0 = $p0")
+            if (p0 == BluetoothProfile.HID_DEVICE) {
+                clearConnection()
+                hidDevice = null
+                hidRegistered = false
+            }
         }
     }
 
@@ -113,12 +123,17 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
                 "onAppStatusChanged() called with: pluggedDevice = $pluggedDevice, registered = $registered"
             )
             hidRegistered = registered
+            if (!registered) clearConnection()
         }
 
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             super.onConnectionStateChanged(device, state)
             Log.d(TAG, "onConnectionStateChanged() called with: device = $device, state = $state")
-            connectedDevice = if (state == BluetoothProfile.STATE_CONNECTED) device else null
+            if (state == BluetoothProfile.STATE_CONNECTED && device != null) {
+                establishConnection(device)
+            } else if (device == connectedDevice) {
+                clearConnection()
+            }
             connecting = if (state == BluetoothProfile.STATE_CONNECTING) device?.address else null
         }
     }
@@ -139,6 +154,7 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
                         val intExtra = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0)
                         Log.i(TAG, "onReceive: $intExtra")
                         bluetoothState = intExtra == BluetoothAdapter.STATE_ON
+                        if (!bluetoothState) clearConnection()
                     }
 
                     BluetoothDevice.ACTION_FOUND -> {
@@ -157,6 +173,7 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
         context.lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 super.onDestroy(owner)
+                clearConnection()
                 context.unregisterReceiver(bluetoothStateReceiver)
                 context.unRegisterAsHid(hidDevice)
                 bluetoothManager.closeBluetoothProfile(hidDevice)
@@ -202,6 +219,7 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
     }
 
     override fun permissionChanged() {
+        if (context.get()?.permissionOk() != true) clearConnection()
         refreshBondDevices()
         bluetoothPermissionIndex = bluetoothPermissionIndex.inc()
     }
@@ -223,26 +241,26 @@ class BluetoothHidControllerImpl(activity: MainActivity) : BluetoothHidControlle
 
     override fun disconnectDevice(address: String): Boolean {
         val context = context.get() ?: return false
+        if (connectedDevice?.address == address) clearConnection()
         return context.disconnectDevice(hidDevice, bondDevices, address)
     }
 
+    private fun clearConnection() {
+        connectionState.value?.disconnect()
+        connectionState.value = null
+        connectedDevice = null
+    }
+
     @SuppressLint("MissingPermission")
-    override suspend fun sendRawKey(key: HidKey): Boolean {
-        // Bluetooth/Compose state belongs to the main thread. Capture one target for
-        // both reports so a reconnect cannot send the release to another computer.
-        val target = withContext(Dispatchers.Main.immediate) {
-            val context = context.get()
-            val hid = hidDevice
-            val device = connectedDevice
-            if (context != null && context.permissionOk() && hid != null && device != null) {
-                hid to device
-            } else null
-        } ?: return false
-        return withContext(Dispatchers.IO) {
-            keyboard.sendRawKey(key) { report ->
-                target.first.sendReport(target.second, 2, report)
-            }
-        }
+    private fun establishConnection(device: BluetoothDevice) {
+        if (connectedDevice == device && connectionState.value?.isConnected == true) return
+        clearConnection()
+        val hid = hidDevice ?: return
+        if (context.get()?.permissionOk() != true) return
+        connectedDevice = device
+        connectionState.value = HidKeyboardSession(
+            device.name ?: device.address, Dispatchers.IO, keyboard,
+        ) { report -> hid.sendReport(device, 2, report) }
     }
 
     override fun refreshBondDevices() {

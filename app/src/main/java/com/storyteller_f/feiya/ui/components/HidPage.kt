@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,6 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -87,14 +94,15 @@ fun HidScreen(
     connectDevice: (String) -> Boolean = { false },
     sendText: (String) -> Unit = {},
     keyboardState: HidKeyboardState = HidKeyboardState(),
-    editContent: (String) -> Unit = {},
-    sendContent: () -> Unit = {},
+    cancelTask: (Long) -> Unit = {},
+    cancelAll: () -> Unit = {},
     selectLayout: (TargetKeyboardLayout) -> Unit = {},
     selectCalibration: (KeyboardCalibration) -> Unit = {},
     sendLeftCalibrationKey: () -> Unit = {},
     sendRightCalibrationKey: () -> Unit = {},
     disconnect: (String) -> Unit = {},
 ) {
+    var draft by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     val context = LocalContext.current
     val toBluetoothSettings = {
         val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
@@ -104,23 +112,28 @@ fun HidScreen(
     val rootModifier = Modifier
         .fillMaxWidth()
         .fillMaxHeight()
-    when (bluetoothState) {
-        HidState.NotSupport -> NotSupportPage()
-        HidState.BluetoothOff -> BluetoothOffPage()
-        HidState.NoPermission -> NoPermissionPage(requestPermission)
+    Column(modifier = rootModifier) {
+        HidTaskPanel(keyboardState.tasks, cancelTask, cancelAll)
+        Box(Modifier.weight(1f)) {
+            when (bluetoothState) {
+                HidState.NotSupport -> NotSupportPage()
+                HidState.BluetoothOff -> BluetoothOffPage()
+                HidState.NoPermission -> NoPermissionPage(requestPermission)
 
-        is HidState.NoBond -> EmptyBoundPage(
-            rootModifier,
-            bluetoothState,
-            toBluetoothSettings,
-            connectDevice
-        )
+                is HidState.NoBond -> EmptyBoundPage(
+                    rootModifier,
+                    bluetoothState,
+                    toBluetoothSettings,
+                    connectDevice
+                )
 
-        is HidState.Done -> ConnectedPage(
-            rootModifier, bluetoothState, sendText, keyboardState, editContent, sendContent,
-            selectLayout, selectCalibration, sendLeftCalibrationKey, sendRightCalibrationKey,
-        ) {
-            disconnect(bluetoothState.device.address)
+                is HidState.Done -> ConnectedPage(
+                    rootModifier, bluetoothState, sendText, keyboardState, draft, { draft = it },
+                    selectLayout, selectCalibration, sendLeftCalibrationKey, sendRightCalibrationKey,
+                ) {
+                    disconnect(bluetoothState.device.address)
+                }
+            }
         }
     }
 }
@@ -156,8 +169,8 @@ private fun ConnectedPage(
     bluetoothState: HidState.Done,
     sendText: (String) -> Unit,
     keyboardState: HidKeyboardState,
-    editContent: (String) -> Unit,
-    sendContent: () -> Unit,
+    draft: TextFieldValue,
+    editContent: (TextFieldValue) -> Unit,
     selectLayout: (TargetKeyboardLayout) -> Unit,
     selectCalibration: (KeyboardCalibration) -> Unit,
     sendLeftCalibrationKey: () -> Unit,
@@ -184,12 +197,12 @@ private fun ConnectedPage(
             }
         }
         TextField(
-            value = keyboardState.content,
+            value = draft,
             onValueChange = editContent,
             label = { Text(stringResource(R.string.hid_text)) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("hid_text"),
         )
-        Button(onClick = sendContent) {
+        Button(onClick = { sendText(draft.text) }, enabled = draft.text.isNotEmpty(), modifier = Modifier.testTag("hid_send")) {
             Text(text = stringResource(R.string.send))
         }
         Button(onClick = { sendText("serviceBinder") }) {

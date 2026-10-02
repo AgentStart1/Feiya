@@ -25,6 +25,17 @@ Windows CRLF line endings send one Enter. If a text contains unsupported charact
 Connection or permission failures stop the current message; check the connection
 before retrying. Text already sent before a connection failure cannot be undone.
 
+The HID screen shows queued, sending, sent, failed, and cancelled tasks, with the
+target computer and completed-key count. Cancel one task or all pending work;
+cancellation does not undo keys already sent. The latest ten completed tasks remain
+visible, including after disconnecting. “Sent” means the Bluetooth API accepted the
+press/release reports, not that the computer confirmed text entry.
+
+Each task stays bound to the connection present when submitted. Disconnecting,
+switching computers, or reconnecting to the same computer stops old tasks instead
+of forwarding their remaining keys to the new connection. Check the destination
+before submitting again. Editing the draft while sending does not change queued text.
+
 For macOS Keyboard Setup Assistant, use the calibration controls available whenever
 a computer is connected, regardless of its Bluetooth name:
 

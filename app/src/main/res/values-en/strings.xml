@@ -41,4 +41,19 @@
     <string name="hid_physical_slash">Send physical / key</string>
     <string name="hid_unsupported_text">Text contains unsupported characters. Nothing was sent. Use ASCII text.</string>
     <string name="hid_send_failed">Send failed. Check the Bluetooth connection and permissions, then retry.</string>
+    <string name="hid_tasks">Send tasks</string>
+    <string name="hid_cancel_all">Cancel all</string>
+    <string name="hid_cancel">Cancel</string>
+    <string name="hid_task_key">Key</string>
+    <string name="hid_task_target">#%1$d · %2$s → %3$s</string>
+    <string name="hid_task_progress">%1$s · %2$d/%3$d keys</string>
+    <string name="hid_task_queued">Queued</string>
+    <string name="hid_task_sending">Sending</string>
+    <string name="hid_task_cancelling">Cancelling</string>
+    <string name="hid_task_sent">Sent</string>
+    <string name="hid_task_failed">Failed</string>
+    <string name="hid_task_cancelled">Cancelled</string>
+    <string name="hid_not_connected">No connected device</string>
+    <string name="hid_connection_changed">Connection changed; task stopped. Check the target device before sending again.</string>
+    <string name="hid_progress_help">Progress counts completed press/release pairs. Sent means Bluetooth accepted the reports, not that the computer entered the text. Cancelling does not undo sent keys.</string>
 </resources>
