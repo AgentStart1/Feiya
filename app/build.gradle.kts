@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.storyteller_f.feiya"
-        minSdk = 24
+        minSdk = 33
         targetSdk = 37
         versionCode = 8
         versionName = "1.8"
