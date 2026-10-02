@@ -150,6 +150,8 @@ restrictions require device testing and remain unverified in this environment.
 ## Minified builds
 
 PR CI assembles both Alpha and Release without signing secrets, in addition to tests.
+It then signs disposable APK copies and verifies HTTP startup and WebSocket echo on
+an Android 16 / API 36 x86_64 emulator. Production signing keys are never used.
 Debug does not run R8 and cannot detect missing-class failures in these variants.
 Local builds without the release signing environment variables produce unsigned APKs.
 
@@ -159,6 +161,21 @@ Netty detects unavailable JFR at runtime, and its LDAP references belong to TLS
 certificate-error diagnostics unused by Feiya's plain HTTP Netty listeners. These
 rules do not add desktop APIs to Android or disable certificate verification. Recheck
 them when upgrading Netty or adding TLS listeners; do not suppress all R8 warnings.
+
+Netty's `ReflectiveChannelFactory` invokes public no-argument Channel constructors.
+Keep these constructors for live `io.netty.channel` implementations; `-dontwarn` does
+not preserve reflective entry points. Class names and unrelated members can still
+be optimized. Assemble success alone is not evidence that a minified app starts.
+
+The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
+Use a disposable emulator: it refuses to overwrite existing installations or test
+against an already-running HTTP listener on port 8080. The wrapper acquires the
+shared device lock via `scripts/adb-device-lock.sh` before installation, then removes
+only its own installation and port forwarding. Results and filtered startup logs go
+to the output directory; CI uploads them even if the smoke check fails. Use
+`scripts/sign-smoke-apks.sh OUTPUT_DIR ALPHA_UNSIGNED_APK RELEASE_UNSIGNED_APK` to
+create disposable signed copies for this check. This covers startup, HTTP, and
+WebSocket traffic, not Bluetooth HID or every production-device configuration.
 
 ## Shared URI integrity and device-test fixtures
 

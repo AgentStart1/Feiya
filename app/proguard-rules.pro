@@ -220,3 +220,9 @@
 # Feiya's Netty listeners use plain HTTP; revisit if TLS listeners are introduced.
 -dontwarn javax.naming.ldap.LdapName
 -dontwarn javax.naming.ldap.Rdn
+
+# Ktor passes Channel class literals to Netty's ReflectiveChannelFactory, which
+# calls Class.getConstructor(). Keep the public no-arg constructors, not all Netty.
+-keepclassmembers,allowoptimization class io.netty.channel.** implements io.netty.channel.Channel {
+    public <init>();
+}
