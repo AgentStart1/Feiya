@@ -159,3 +159,12 @@ Netty detects unavailable JFR at runtime, and its LDAP references belong to TLS
 certificate-error diagnostics unused by Feiya's plain HTTP Netty listeners. These
 rules do not add desktop APIs to Android or disable certificate verification. Recheck
 them when upgrading Netty or adding TLS listeners; do not suppress all R8 warnings.
+
+## Shared URI integrity and device-test fixtures
+
+Shared URI updates are serialized on IO workers, ignore repeat additions, and repair
+legacy duplicate entries when loading. The combined file list also deduplicates by
+URI, which is the Compose list key. Instrumented tests create unique temporary file
+fixtures, wait for asynchronous additions, and remove only their own entries/files
+in `@After`; they must not append permanent `file:///test.zip` entries. SSE assertions
+have a timeout and propagate failures instead of swallowing them.

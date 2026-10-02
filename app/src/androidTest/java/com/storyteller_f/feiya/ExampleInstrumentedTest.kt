@@ -31,10 +31,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.UUID
+import android.content.Context
+import com.storyteller_f.feiya.service.SharedFileInfo
+import kotlinx.coroutines.withTimeout
 
 /**
  * Instrumented test, which will execute on an Android device.
@@ -43,6 +49,27 @@ import java.io.File
  */
 @RunWith(AndroidJUnit4::class)
 class ExampleInstrumentedTest {
+
+    private val context get() = ApplicationProvider.getApplicationContext<Context>()
+    private val fixtureDirectory by lazy { File(context.cacheDir, "share-test-${UUID.randomUUID()}") }
+    private val fixture by lazy { File(fixtureDirectory, "test.zip") }
+    private val fixtureUri get() = fixture.toUri()
+
+    @Before fun createFixture() {
+        fixtureDirectory.mkdirs()
+        fixture.writeText("test fixture")
+    }
+
+    @After fun removeFixture() {
+        try {
+            runBlocking {
+                context.removeUri(SharedFileInfo(fixtureUri.toString(), fixture.name))
+                context.cacheInvalid()
+            }
+        } finally {
+            fixtureDirectory.deleteRecursively()
+        }
+    }
 
     @get:Rule
     val serviceRule = ServiceTestRule()
@@ -97,7 +124,8 @@ class ExampleInstrumentedTest {
     @Test
     fun testLogin() {
         useClient { serviceBinder, httpClient, _, _ ->
-            serviceBinder.appendUri("file:///test.zip".toUri())
+            serviceBinder.appendUri(fixtureUri)
+            withTimeout(10_000) { shares.first { files -> files.any { it.uri == fixtureUri.toString() } } }
             val response =
                 httpClient.get("http://${AppService.LISTENER_ADDRESS}:${AppService.DEFAULT_PORT}/shares")
             assertTrue(response.status.isSuccess())
@@ -112,17 +140,14 @@ class ExampleInstrumentedTest {
             val deferred = async {
                 val session = sseClient.sseSession(urlString = "http://${AppService.LISTENER_ADDRESS}:${AppService.DEFAULT_PORT}/sse")
                 try {
-                    session.incoming.first {
-                        it.data == "refresh"
-                    }
-                    session.cancel()
-                } catch (e: Exception) {
+                    withTimeout(10_000) { session.incoming.first { it.data == "refresh" } }
+                } finally {
                     session.cancel()
                 }
             }
             launch {
                 delay(1000)
-                serviceBinder.appendUri("file:///test.zip".toUri())
+                serviceBinder.appendUri(fixtureUri)
             }
             deferred.await()
         }
