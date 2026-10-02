@@ -67,8 +67,10 @@ class AppService : LifecycleService() {
         super.onCreate()
         installNotificationChannel()
         installDefaultNotificationChannel()
+        postForegroundNotify(getString(R.string.service_starting))
 
         lifecycleScope.launch {
+            cacheInvalid()
             var previousPort: Int? = null
             combine(portFlow, specialEvent) { port, eventPort ->
                 eventPort to port
@@ -126,16 +128,15 @@ class AppService : LifecycleService() {
 
 
     private fun postForegroundNotify(message: String) {
-        if (NotificationManagerCompat.from(this).areNotificationsEnabled()) {
-            val notification =
-                NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(getString(R.string.app_name))
-                    .setContentText(message)
-                    .build()
-            notification.contentIntent = openMainActivity()
-            startForeground(FOREGROUND_NOTIFICATION_ID, notification)
-        }
+        // Foreground promotion is required even when notification permission is denied.
+        val notification = NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(message)
+            .setOngoing(true)
+            .setContentIntent(openMainActivity())
+            .build()
+        startForeground(FOREGROUND_NOTIFICATION_ID, notification)
     }
 
     private fun postNotify(message: String) {

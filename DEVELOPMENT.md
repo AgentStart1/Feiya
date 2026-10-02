@@ -113,3 +113,24 @@ port-switch failures, switching back, IPv6 redirects, and real loopback HTTP lis
 shutdown. These are JVM/server integration tests, not Android device or Windows
 browser end-to-end tests. Recheck downloads in a Windows browser with the provider
 and file that originally reproduced issue #6 before claiming platform coverage.
+
+## Boot startup
+
+`BootSettingsHost` owns loading/saving/error state on the application-owned serial
+settings dispatcher. The activity closes the Host and observes it with lifecycle-aware
+collection. `DataStoreBootSettings` stores `start_on_boot` in the existing settings
+DataStore; an absent key means disabled. Failed writes preserve the last saved UI value.
+
+The non-exported `BootReceiver` handles only `BOOT_COMPLETED`, after credential storage
+is available. It uses `goAsync` with an eight-second timeout and always finishes the
+pending broadcast. Enabled startup uses the existing `remoteMessaging` foreground
+service; Android 17 local-network permission must already be granted. It does not
+launch a permission dialog or activity. Denied startup is logged without retrying.
+The application initializes the shared-list path, and the service reloads shared
+files before starting its listener. Foreground promotion happens immediately, including
+when notification permission is denied.
+
+Local tests cover preference persistence, Host errors/cancellation, switch rendering,
+boot gating, timeout and denied-start cleanup, manifest receiver delivery, and foreground
+promotion without notification permission. Actual reboot and manufacturer autostart
+restrictions require device testing and remain unverified in this environment.

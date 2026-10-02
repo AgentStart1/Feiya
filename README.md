@@ -80,6 +80,19 @@ new address automatically. If the new port cannot start, the previous service st
 available. Stopping or restarting the service releases the old ports; links to those
 ports then stop working.
 
+## Start on boot
+
+Enable **Settings → Start on boot** to start file sharing and messaging after the
+phone restarts and is unlocked for the first time. It is off by default. The service
+loads your saved port and shared files without opening the app; Bluetooth HID still
+requires connecting from the HID screen. Turning the switch off affects future boots
+and does not stop a running service.
+
+Open Feiya once after installation. On Android 17 or later, grant local-network
+access in the app before relying on boot startup. Some phones also require allowing
+Feiya in their battery or autostart settings. Force-stopping or restricting the app
+can prevent Android from delivering the boot event; open it again to restore startup.
+
 ## Development
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for building from source, tests, and current
