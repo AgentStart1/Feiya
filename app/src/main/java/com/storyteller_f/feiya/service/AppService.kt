@@ -13,6 +13,7 @@ import androidx.core.app.PendingIntentCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import com.storyteller_f.feiya.FeiyaApplication
 import com.storyteller_f.feiya.MainActivity
 import com.storyteller_f.feiya.R
 import com.storyteller_f.feiya.appendText
@@ -45,7 +46,7 @@ val Context.portFlow
 val specialEvent = MutableStateFlow<Int?>(null)
 
 class AppService : LifecycleService() {
-    val server = AppServer(this)
+    val server by lazy { AppServer(this, (application as FeiyaApplication).serverCoordination) }
 
     override fun onBind(intent: Intent): IBinder {
         super.onBind(intent)
@@ -68,11 +69,15 @@ class AppService : LifecycleService() {
         installDefaultNotificationChannel()
 
         lifecycleScope.launch {
+            var previousPort: Int? = null
             combine(portFlow, specialEvent) { port, eventPort ->
                 eventPort to port
             }.collect { (event, port) ->
                 Log.i(TAG, "onCreate: port $event $port")
-                server.onReceiveEventPort(port, event)
+                // A remembered stop/restart command must not replay when only the port changes.
+                val command = if (previousPort != null && previousPort != port) null else event
+                previousPort = port
+                server.onReceiveEventPort(port, command)
             }
         }
         lifecycleScope.launch {

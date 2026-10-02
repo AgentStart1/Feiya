@@ -72,6 +72,14 @@ These controls send physical keys independently of the text layout selection and
 are available whenever a computer is connected, regardless of its Bluetooth name.
 ISO calibration does not add international text layouts.
 
+## Changing the server port
+
+When you change the server port, links using earlier ports redirect to the active
+port for the rest of the service session. Open file-list and chat pages move to the
+new address automatically. If the new port cannot start, the previous service stays
+available. Stopping or restarting the service releases the old ports; links to those
+ports then stop working.
+
 ## Development
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for building from source, tests, and current

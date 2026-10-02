@@ -85,7 +85,7 @@ version in [README.md](README.md) and a target computer. The validation checklis
   layout selected and with a Bluetooth name that does not contain `Mac`.
 - Disconnect during a send and verify a new send works after reconnecting.
 
-## HTTP downloads
+## HTTP downloads and port changes
 
 `respondUri` reads optional provider metadata on the IO dispatcher. Unknown or
 negative sizes remain unknown; they must not become `Content-Length: 0`. The response
@@ -93,6 +93,23 @@ opens a fresh input stream for each body/range and closes it on completion or
 cancellation. HEAD requests return metadata without opening a stream. Providers
 need not supply DocumentsContract MIME/last-modified columns or seekable descriptors.
 
-Local HTTP tests cover unknown sizes, optional metadata, full/range/HEAD responses,
-empty files, and cancellation cleanup. Windows browser validation with the original
-provider/file from issue #6 remains necessary for platform-specific confirmation.
+`PortHandoff` serializes port changes through the service event collector. `AppServer`
+uses an injected, application-owned serial background dispatcher; its coroutine scope
+is owned by the service lifecycle. Blocking server start/stop and file IO run on IO
+workers. A new
+server and its self WebSocket must start before existing ports become redirects.
+Each retained listener redirects directly to the latest active port with HTTP 307,
+preserving host, path, query, and request method; redirects use `Cache-Control: no-store`.
+Selecting an earlier port reactivates its existing server. Stop/restart/service
+shutdown closes all retained listeners and clients. Listeners are retained only
+for the current service lifetime; they continue to occupy their ports until stopped.
+Each listener retains its server/client so it can be reactivated without rebinding.
+
+Index/chat pages subscribe to port-change SSE events and replace their location,
+preserving the path, query, and fragment. The shared handler is `port-change.js`.
+
+Local tests cover provider metadata, full/range/HEAD responses, cancellation cleanup,
+port-switch failures, switching back, IPv6 redirects, and real loopback HTTP listener
+shutdown. These are JVM/server integration tests, not Android device or Windows
+browser end-to-end tests. Recheck downloads in a Windows browser with the provider
+and file that originally reproduced issue #6 before claiming platform coverage.
