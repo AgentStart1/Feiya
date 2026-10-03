@@ -1,15 +1,7 @@
 import test from "node:test";
-import { renderMarkdown } from "../../app/src/main/resources/web/markdown.mjs";
+import { renderMarkdown } from "../src/markdown.mjs";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-// Import the production Worker module without imposing a package type on Android resources.
-const source = await readFile(
-  new URL("../../app/src/main/resources/web/host.js", import.meta.url),
-  "utf8",
-);
-const { WebHost } = await import(
-  `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
-);
+import { WebHost } from "../src/host.js";
 function setup(overrides = {}) {
   const states = [],
     effects = [],

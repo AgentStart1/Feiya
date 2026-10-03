@@ -1,4 +1,4 @@
-import MarkdownIt from "./vendor/markdown-it/markdown-it.esm.min.mjs";
+import MarkdownIt from "markdown-it";
 
 // Keep raw HTML disabled: only parser-generated markup reaches the DOM.
 const markdown = new MarkdownIt({ html: false, breaks: true, linkify: true });

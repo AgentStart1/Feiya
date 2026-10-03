@@ -1,7 +1,8 @@
 # Development
 
 Use JDK 21 or later and an Android SDK with platform 37. Set `ANDROID_HOME` to the SDK
-directory (or configure `sdk.dir` in your local `local.properties`).
+directory (or configure `sdk.dir` in your local `local.properties`). Install Node.js
+24 and npm on `PATH` as well; Android builds compile the shared browser UI automatically.
 
 ```sh
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
@@ -204,60 +205,76 @@ have a timeout and propagate failures instead of swallowing them.
 
 ## Shared browser UI
 
-The production pages live in `app/src/main/resources/feiya`: `index.html`, `login.html`,
-and `chat.html`. Shared styles, JavaScript, and icons live in the sibling `web/` directory.
-The page namespace avoids collisions with dependency resources such as `index.html`.
-Ktor serves
-`/login` and `/web/*` before authentication, and `/` and `/messages` after session
-validation. `/shares`, `/shares/{index}`, `/sse`, and `/chat` retain their existing
-protocols. File downloads still use server list indices.
+`web/` is a standalone npm project. HTML lives in `web/src/pages`, and the app,
+Worker, Host, Markdown adapter, and stylesheet live in `web/src`. Runtime libraries
+(`markdown-it` and `@phosphor-icons/core`) are declared in `web/package.json` and
+locked in `web/package-lock.json`. Build/test tools are devDependencies. Dependabot
+checks `/web` weekly, including transitive updates through the lockfile.
 
-`web/host.js` owns asynchronous feature state and effects without DOM dependencies.
-`web/worker.js` injects browser networking and timers in one dedicated Worker per
-page. `web/app.js` renders snapshots and owns the immediately updated text draft.
-Page exit terminates the Worker; a back/forward cache restore starts a fresh Host.
-Messages are not automatically replayed after disconnect. Clipboard copying uses
-the secure-context API when available and a user-gesture fallback for LAN HTTP.
-
-Run the isolated web checks with Node.js 22 or later:
+Use Node.js 24 (`web/.nvmrc`) and npm:
 
 ```sh
-npm ci --prefix tests/web
-npm --prefix tests/web test
-npm --prefix tests/web exec -- playwright install --with-deps chromium
-npm --prefix tests/web run test:browser
-npm --prefix tests/web run preview
+npm ci --prefix web
+npm --prefix web run build
+npm --prefix web test
+npm --prefix web exec -- playwright install --with-deps chromium
+npm --prefix web run test:browser
+npm --prefix web run preview
 ```
 
-The preview runs on `127.0.0.1:4173` with mock HTTP/SSE/WebSocket data; it is not an
-Android end-to-end test. Browser tests save desktop/mobile screenshots to ignored
-`tests/web/artifacts/`. `WebPagesTest` separately checks the real Ktor routes,
-authentication redirects, login, and bundled assets using a JVM server.
+`build` bundles JavaScript/CSS with esbuild, copies HTML and only referenced icon
+assets, and derives third-party license notices from the actual bundled packages.
+The output is `web/dist/feiya/*.html` and `web/dist/web/*`. Neither `dist` nor
+`node_modules` is committed. No vendoring step is needed when dependencies change.
+Update packages with npm and commit both `package.json` and `package-lock.json`.
 
-Icons are vendored from [Phosphor Icons core 2.1.1](https://github.com/phosphor-icons/core)
-under its MIT license (`web/icons/LICENSE`). They need no runtime package or CDN.
-Use upstream SVG assets when adding icons and retain the license.
+### Android packaging
 
-### Message Markdown
+Every Android variant registers generated Java resources through the AGP variant
+API. Gradle runs `:app:installWebDependencies` (`npm ci --include=dev`), then
+`:app:buildWeb`, then copies the distribution into its variant-specific generated
+resource directory. HTML, JS, CSS, icons, and notices enter the APK on the classpath;
+source code, test fixtures, node_modules, and source maps do not. npm installation
+and bundling use declared inputs/outputs so unchanged builds skip both tasks.
+A deleted node_modules directory or changed lockfile causes a fresh install.
+Build failures fail the Android build instead of packaging an old distribution.
 
-The Worker injects `web/markdown.mjs` into the Host and parses each incoming
-message once. It ignores any HTML supplied by the sender and publishes locally
-generated HTML alongside the original text. The DOM layer renders that markup;
-copying always uses the original text. Raw HTML stays disabled, and markdown-it's
-default dangerous-URL validation remains enabled. Links open separately with
-`noopener noreferrer`; Markdown images can load their referenced URLs.
-
-The browser bundle of markdown-it 15.0.2 and its license notices are checked in
-under `web/vendor/markdown-it/`; there is no runtime CDN dependency. After updating
-the pinned test-tool dependency and lockfile, regenerate the vendored files with:
+Normal commands such as `./gradlew :app:assembleDebug`, `:app:assembleAlpha`,
+`:app:assembleRelease`, and `:app:testDebugUnitTest` generate the web resources
+automatically. `./gradlew :app:buildWeb` runs just the web build through Gradle.
+CI provisions Node.js for both test and release workflows; the PR workflow also
+runs npm tests and Chromium checks against the bundled output. Both workflows
+compare APK entries against the npm distribution using:
 
 ```sh
-npm ci --prefix tests/web
-npm --prefix tests/web run vendor:markdown
-npm --prefix tests/web test
-npm --prefix tests/web run test:browser
+python3 scripts/check-web-apk.py web/dist app/build/outputs/apk/*/*.apk
 ```
 
-The vendoring script copies the official browser bundle and license files, omitting
-only its source-map reference. Keep raw HTML disabled and run the malicious-input
-fixtures when changing parser options or adding plugins.
+This checks for missing, stale, unexpected, or duplicate web resources and excludes
+node_modules from the APK.
+
+Ktor serves `/login` and `/web/*` before authentication, and `/` and `/messages`
+after session validation. The `feiya/` output namespace avoids collisions with
+dependency resources such as `index.html`. `/shares`, `/shares/{index}`, `/sse`,
+and `/chat` retain their protocols. File downloads still use server list indices.
+
+### State, Markdown, and verification
+
+`web/src/host.js` owns asynchronous state and effects without DOM dependencies.
+`web/src/worker.js` injects networking, timers, and the Markdown renderer in a
+Worker per page. `web/src/app.js` renders snapshots and owns the synchronous draft.
+Page exit terminates the Worker; back/forward cache restore starts a fresh Host.
+Messages are not replayed after disconnect. Clipboard copying uses the secure API
+when available and a user-gesture fallback for LAN HTTP.
+
+The Worker parses each message once, ignoring any sender-supplied HTML. The page
+renders locally generated HTML; copying uses the original text. Raw HTML stays
+disabled, and markdown-it's dangerous-URL validation remains enabled. Links open
+separately with `noopener noreferrer`; message images can load their referenced
+URLs. Run unsafe-input fixtures when changing parser options or adding plugins.
+
+The preview runs on `127.0.0.1:4173` with mock HTTP/SSE/WebSocket data and serves
+the same distribution as the APK. It is not an Android end-to-end test. Browser
+tests save screenshots to ignored `web/test/artifacts/`. `WebPagesTest` separately
+checks real Ktor routes, session login, and generated JS/CSS/icon/notice resources
+using a JVM server. The web build preserves local assets; no CDN is needed.

@@ -1,5 +1,14 @@
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: "/web"
+    groups:
+      web-dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: weekly
+
   - package-ecosystem: gradle
     directory: "/"
     groups:

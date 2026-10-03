@@ -1,12 +1,70 @@
 import com.google.gson.stream.JsonWriter
 import java.io.FileWriter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.android)
     alias(libs.plugins.serialization)
     alias(libs.plugins.easylauncher)
     alias(libs.plugins.compose.compiler)
+}
+
+// The browser is an independent npm project. Only its distribution becomes Java
+// resources; source files and node_modules never enter the APK.
+val webDirectory = rootProject.layout.projectDirectory.dir("web")
+val webDist = webDirectory.dir("dist")
+val npmExecutable = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
+val installWebDependencies = tasks.register<Exec>("installWebDependencies") {
+    group = "build"
+    description = "Install the browser project's locked npm dependencies."
+    workingDir(webDirectory)
+    commandLine(npmExecutable, "ci", "--include=dev", "--no-audit", "--no-fund")
+    inputs.files(webDirectory.file("package.json"), webDirectory.file("package-lock.json"),
+        webDirectory.file(".npmrc"), webDirectory.file(".nvmrc"))
+    inputs.property("nodeVersion", providers.exec { commandLine("node", "--version") }.standardOutput.asText)
+    inputs.property("npmVersion", providers.exec { commandLine(npmExecutable, "--version") }.standardOutput.asText)
+    outputs.dir(webDirectory.dir("node_modules"))
+}
+val buildWeb = tasks.register<Exec>("buildWeb") {
+    group = "build"
+    description = "Bundle the browser UI and npm dependencies."
+    dependsOn(installWebDependencies)
+    workingDir(webDirectory)
+    commandLine(npmExecutable, "run", "build")
+    inputs.dir(webDirectory.dir("src"))
+    inputs.dir(webDirectory.dir("scripts"))
+    inputs.files(webDirectory.file("package.json"), webDirectory.file("package-lock.json"))
+    inputs.files(installWebDependencies.map { it.outputs.files })
+    outputs.dir(webDist)
+}
+
+abstract class SyncWebResources : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val distribution: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @TaskAction
+    fun copyDistribution() {
+        fileSystemOperations.sync {
+            from(distribution)
+            into(outputDirectory)
+        }
+    }
+}
+
+androidComponents.onVariants { variant ->
+    val webResources = tasks.register<SyncWebResources>("generate${variant.name.replaceFirstChar { it.uppercase() }}WebResources") {
+        dependsOn(buildWeb)
+        distribution.set(webDist)
+    }
+    variant.sources.resources?.addGeneratedSourceDirectory(webResources, SyncWebResources::outputDirectory)
 }
 
 val signPath: String? = System.getenv("storyteller_f_sign_path")

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderMarkdown } from "../../app/src/main/resources/web/markdown.mjs";
+import { renderMarkdown } from "../src/markdown.mjs";
 
 test("renders common message formatting and multiline text", () => {
   const html = renderMarkdown(
