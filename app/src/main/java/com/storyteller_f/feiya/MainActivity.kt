@@ -21,35 +21,20 @@ import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.browser.customtabs.CustomTabsServiceConnection
 import androidx.browser.customtabs.CustomTabsSession
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -67,12 +52,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -88,10 +71,11 @@ import com.storyteller_f.feiya.ui.components.MainToolbar
 import com.storyteller_f.feiya.ui.components.HidScreen
 import com.storyteller_f.feiya.ui.components.SharedFiles
 import com.storyteller_f.feiya.ui.components.MessagePage
-import com.storyteller_f.feiya.ui.components.NavDrawer
+import com.storyteller_f.feiya.ui.components.AppShell
+import com.storyteller_f.feiya.ui.components.FormPane
+import com.storyteller_f.feiya.ui.components.destinationTitle
 import com.storyteller_f.feiya.ui.components.SafePage
 import com.storyteller_f.feiya.ui.components.SettingPage
-import com.storyteller_f.feiya.ui.components.SharedFile
 import com.storyteller_f.feiya.ui.components.ShowQrCode
 import com.storyteller_f.feiya.ui.theme.AppTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -196,11 +180,8 @@ class MainActivity : ComponentActivity() {
         bluetoothController.start()
         setContent {
             val state by bluetoothController.state()
-            val port by LocalContext.current.portFlow.collectAsState(initial = AppService.DEFAULT_PORT)
-            val drawerState = rememberDrawerState(DrawerValue.Closed)
+            val port by LocalContext.current.portFlow.collectAsStateWithLifecycle(initialValue = AppService.DEFAULT_PORT)
             val navController = rememberNavController()
-            val scope = rememberCoroutineScope()
-            val snackBarHostState = remember { SnackbarHostState() }
             val density = LocalDensity.current
             val context = LocalContext.current
             val configuration = LocalConfiguration.current
@@ -234,28 +215,34 @@ class MainActivity : ComponentActivity() {
             }
 
             AppTheme {
-                ModalNavigationDrawer(drawerContent = {
-                    Drawer(showAboutWebView, {
-                        scope.launch {
-                            drawerState.close()
+                val route = currentBackStackEntryAsState?.destination?.route ?: "main"
+                val activeRoute = if (route.startsWith("info/")) "main" else route
+                val serviceState by serverState.collectAsStateWithLifecycle(initialValue = ServerState.Init)
+                AppShell(
+                    route = activeRoute,
+                    navigate = { destination ->
+                        navController.navigate(destination) {
+                            popUpTo("main") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                    }) {
-                        navController.navigate(it)
-                    }
-                }, drawerState = drawerState) {
-                    Scaffold(topBar = {
-                        TopBar(port, sendText) {
-                            scope.launch {
-                                drawerState.open()
-                            }
-                        }
-                    }, floatingActionButton = {
-                        Floating(currentBackStackEntryAsState?.destination?.route.orEmpty())
-                    }, snackbarHost = {
-                        SnackbarHost(hostState = snackBarHostState) { }
-                    }) { paddingValues ->
-                        MainContent(paddingValues, navController, port, sendText, state)
-                    }
+                    },
+                    about = showAboutWebView,
+                    topBar = {
+                        MainToolbar(
+                            title = destinationTitle(activeRoute),
+                            port = ((serviceState as? ServerState.Started)?.port ?: port).toString(),
+                            state = serviceState,
+                            restartService = { currentServiceBinder?.restart() },
+                            stopService = { currentServiceBinder?.stop() },
+                            sendText = sendText,
+                            deleteAll = { shares.value.forEach(::deleteItem) },
+                            showFileActions = activeRoute == "main",
+                            about = showAboutWebView,
+                        )
+                    },
+                ) { paddingValues ->
+                    MainContent(paddingValues, navController, (serviceState as? ServerState.Started)?.port ?: port, sendText, state)
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -325,7 +312,7 @@ class MainActivity : ComponentActivity() {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues).consumeWindowInsets(paddingValues),
             color = MaterialTheme.colorScheme.background
         ) {
             NavHost(navController = navController, startDestination = "main") {
@@ -336,55 +323,9 @@ class MainActivity : ComponentActivity() {
                     ::deleteItem,
                     sendText,
                     ::requestPermission
-                ) { i -> navController.navigate("info/$i") }
-            }
-        }
-    }
-
-    @Composable
-    private fun Floating(text: String) {
-        if (text != "messages")
-            FloatingActionButton(onClick = {
-                pickFile.launch(arrayOf("*/*"))
-            }) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = getString(R.string.add_file)
                 )
             }
-    }
-
-    @Composable
-    private fun Drawer(
-        showAboutWebView: () -> Unit,
-        closeDrawer: () -> Unit,
-        navigateTo: (String) -> Unit
-    ) {
-        ModalDrawerSheet(modifier = Modifier.widthIn(max = 280.dp)) {
-            Spacer(Modifier.height(12.dp))
-            NavDrawer({
-                closeDrawer()
-            }, navigateTo, showAboutWebView)
         }
-    }
-
-    @Composable
-    private fun TopBar(
-        port: Int,
-        sendText: (String) -> Unit,
-        openDrawer: () -> Unit
-    ) {
-        MainToolbar(
-            port.toString(),
-            { currentServiceBinder?.restart() },
-            { currentServiceBinder?.stop() },
-            sendText,
-            openDrawer,
-            {
-                shares.value.forEach(::deleteItem)
-            },
-            serverState
-        )
     }
 
     private fun requestPermission() {
@@ -412,37 +353,39 @@ class MainActivity : ComponentActivity() {
         saveToLocal: (SharedFileInfo) -> Unit,
         deleteItem: (SharedFileInfo) -> Unit,
         sendText: (String) -> Unit,
-        requestPermission: () -> Unit,
-        navigateToInfo: (Int) -> Unit
+        requestPermission: () -> Unit
     ) {
         composable("main") {
-            val infoList by shares.collectAsState()
-            SharedFiles(infoList, deleteItem, saveToLocal) {
-                val i = shares.value.indexOf(it)
-                navigateToInfo(i)
-            }
-        }
-        composable("info/{index}", arguments = listOf(navArgument("index") {
-            type = NavType.IntType
-        })) {
-            val i = it.arguments?.getInt("index")
-            Info(i ?: 0, port.toString(), sendText)
+            val infoList by shares.collectAsStateWithLifecycle()
+            var qrUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+            SharedFiles(infoList, deleteItem, saveToLocal,
+                viewInfo = { qrUri = it.uri },
+                addFiles = { pickFile.launch(arrayOf("*/*")) },
+            )
+            val qrIndex = infoList.indexOfFirst { it.uri == qrUri }
+            if (qrUri != null && qrIndex >= 0) AlertDialog(
+                onDismissRequest = { qrUri = null },
+                title = { Text(getString(R.string.file_share_code)) },
+                text = { ShowQrCode("shares/$qrIndex", port.toString(), sendText = sendText) },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = { qrUri = null }) { Text(getString(android.R.string.ok)) } },
+            )
+            LaunchedEffect(qrIndex) { if (qrIndex < 0) qrUri = null }
         }
         composable("settings") {
             val bootSettings by bootSettingsHost.state.collectAsStateWithLifecycle()
-            SettingPage(
+            FormPane { SettingPage(
                 port.toString(),
                 bootSettings,
                 bootSettingsHost::setEnabled,
                 bootSettingsHost::reload,
-            )
+            ) }
         }
         composable("messages") {
             Messages()
         }
         composable("hid") {
             val keyboardState by keyboardHost.state.collectAsStateWithLifecycle()
-            HidScreen(
+            FormPane { HidScreen(
                 bluetoothState = state,
                 requestPermission = requestPermission,
                 connectDevice = bluetoothController::connectDevice,
@@ -455,10 +398,10 @@ class MainActivity : ComponentActivity() {
                 sendLeftCalibrationKey = keyboardHost::sendLeftCalibrationKey,
                 sendRightCalibrationKey = keyboardHost::sendRightCalibrationKey,
                 disconnect = { bluetoothController.disconnectDevice(it) },
-            )
+            ) }
         }
         composable("safe") {
-            SafePage()
+            FormPane { SafePage() }
         }
     }
 
@@ -472,7 +415,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun Messages() {
-        val messageList by messageFlow.collectAsState(initial = emptyList())
+        val messageList by messageFlow.collectAsStateWithLifecycle(initialValue = emptyList())
         MessagePage(messageList) {
             currentServiceBinder?.sendMessage(it)
         }
@@ -557,15 +500,4 @@ class CustomTabConnection(activity: MainActivity) : CustomTabsServiceConnection(
     }
 
     override fun onServiceDisconnected(name: ComponentName) {}
-}
-
-@Composable
-fun Info(i: Int, port: String, sendText: (String) -> Unit) {
-    val currentShares by shares.collectAsState()
-
-    Column {
-        SharedFile(info = currentShares[i])
-        ShowQrCode("shares/$i", port, Modifier.padding(top = 20.dp), sendText)
-    }
-
 }

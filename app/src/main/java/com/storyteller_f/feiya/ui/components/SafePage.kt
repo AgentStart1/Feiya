@@ -6,6 +6,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.feiya.dataStore
+import com.storyteller_f.feiya.R
+import androidx.compose.ui.res.stringResource
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -13,7 +15,7 @@ import com.storyteller_f.feiya.dataStore
 fun SafePage() {
     PrefsScreen(dataStore = LocalContext.current.dataStore) {
         prefsItem {
-            EditTextPref(key = "password", title = "password", summary = "想要访问内容必需输入此密码，为空代表不需要密码")
+            EditTextPref(key = "password", title = stringResource(R.string.access_password), summary = stringResource(R.string.access_password_hint))
         }
     }
 }

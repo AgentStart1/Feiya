@@ -6,6 +6,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -112,9 +117,7 @@ fun HidScreen(
     val rootModifier = Modifier
         .fillMaxWidth()
         .fillMaxHeight()
-    Column(modifier = rootModifier) {
-        HidTaskPanel(keyboardState.tasks, cancelTask, cancelAll)
-        Box(Modifier.weight(1f)) {
+    val connectionContent: @Composable () -> Unit = {
             when (bluetoothState) {
                 HidState.NotSupport -> NotSupportPage()
                 HidState.BluetoothOff -> BluetoothOffPage()
@@ -134,8 +137,27 @@ fun HidScreen(
                     disconnect(bluetoothState.device.address)
                 }
             }
+    }
+    BoxWithConstraints(rootModifier.imePadding()) {
+        val taskHeight = maxHeight * 0.45f
+        if (maxWidth >= 720.dp && keyboardState.tasks.isNotEmpty()) {
+            Row(rootModifier) {
+                Box(Modifier.weight(1f)) { connectionContent() }
+                VerticalDivider()
+                Column(Modifier.width(280.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                    HidTaskPanel(keyboardState.tasks, cancelTask, cancelAll)
+                }
+            }
+        } else {
+            Column(rootModifier) {
+                Column(Modifier.heightIn(max = taskHeight).verticalScroll(rememberScrollState())) {
+                    HidTaskPanel(keyboardState.tasks, cancelTask, cancelAll)
+                }
+                Box(Modifier.weight(1f)) { connectionContent() }
+            }
         }
     }
+
 }
 
 @Composable
