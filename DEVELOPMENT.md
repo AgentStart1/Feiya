@@ -185,10 +185,10 @@ installing the shared channel initializer.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
-against an already-running HTTP listener on port 8080. For shared local devices, the wrapper acquires the
-device lock via `scripts/adb-device-lock.sh` before installation. CI uses a dedicated
-emulator and calls `scripts/smoke-minified.py` directly without locking. Both paths
-remove only their own installation and port forwarding. Results and startup logs go
+against an already-running HTTP listener on port 8080. The shell entry point
+forwards arguments directly to `scripts/smoke-minified.py`; CI invokes that Python
+script directly on its dedicated emulator. Both paths remove only their own
+installation and port forwarding. Results and startup logs go
 to the output directory; CI uploads them even if the smoke check fails. Use
 `scripts/sign-smoke-apks.sh OUTPUT_DIR ALPHA_UNSIGNED_APK RELEASE_UNSIGNED_APK` to
 create disposable signed copies for this check. This covers startup, HTTP, and
