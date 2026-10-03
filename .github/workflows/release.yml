@@ -15,6 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Set up JDK 21
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -36,6 +43,9 @@ jobs:
           storyteller_f_sign_alias: ${{ secrets.ALIAS }}
           storyteller_f_sign_store_password: ${{ secrets.STORE_PASSWORD }}
           storyteller_f_sign_key_password: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Verify packaged web resources
+        run: python3 scripts/check-web-apk.py web/dist app/build/outputs/apk/*/*.apk
 
       - name: Upload artifact
         if: "!startsWith(github.ref, 'refs/tags/')"

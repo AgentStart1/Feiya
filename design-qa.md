@@ -5,16 +5,16 @@ final result: passed
 ## Reference and evidence
 
 - Visual target: selected option 2, `/tmp/feiya-design-options/option-2.png`.
-- Implementation: `tests/web/artifacts/files-desktop.png`.
-- Side-by-side comparison: `tests/web/artifacts/comparison.png` (reference left,
+- Implementation: `web/test/artifacts/files-desktop.png`.
+- Side-by-side comparison: `web/test/artifacts/comparison.png` (reference left,
   implementation right); focused header/first-row comparison:
-  `tests/web/artifacts/comparison-top.png`.
+  `web/test/artifacts/comparison-top.png`.
 - Source and implementation: 1487 × 1058 pixels; browser viewport 1487 × 1058 CSS
   pixels, device scale factor 1. Both captures use the same four file names and
   connected state. No density conversion or browser frame was included.
 - Additional browser captures: `files-mobile.png`, `files-mobile-long.png`,
   `chat-mobile.png`, `chat-desktop.png`, `login-mobile.png`, `login-desktop.png`
-  in `tests/web/artifacts/`. Mobile viewport: 390 × 844 CSS pixels at scale 1.
+  in `web/test/artifacts/`. Mobile viewport: 390 × 844 CSS pixels at scale 1.
 - Captures are local verification artifacts, not bundled application resources.
 
 ## Findings and comparison history
@@ -41,7 +41,7 @@ final result: passed
   a top navigation row so both destinations remain directly available.
 - Tokens: Feiya primary `#206c29`, page `#fcfdf6`, sage sidebar `#e8eedd`, muted
   text `#52634f`. Flat surfaces intentionally omit image-generation texture.
-- Assets: vendored Phosphor 2.1.1 SVGs, retained MIT license, no external requests.
+- Assets: Phosphor SVGs supplied by the npm build, retained MIT license, no external requests.
   Library file-type glyphs replace the mock's illustrative glyph shapes. They
   remain sharp at both sizes and preserve the reference's type colors.
 - Copy: the file page preserves the selected Chinese hierarchy and labels.

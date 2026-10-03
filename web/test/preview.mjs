@@ -2,7 +2,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-const root = new URL("../../app/src/main/resources/", import.meta.url);
+const root = new URL("../dist/", import.meta.url);
 export async function createPreview(port = 0) {
   const state = {
     files: [
@@ -59,7 +59,7 @@ export async function createPreview(port = 0) {
         "/messages": "feiya/chat.html",
       }[pathname] || pathname.slice(1);
     if (
-      !/^(web\/[a-z0-9/.-]+|feiya\/(index.html|login.html|chat.html))$/.test(
+      !/^(web\/[a-z0-9/.-]+|feiya\/(index.html|login.html|chat.html))$/i.test(
         path,
       ) ||
       path.includes("..")

@@ -40,7 +40,7 @@ class WebPagesTest {
                             connection.outputStream.use { it.write(form.toByteArray()) }
                         }
                         val status = connection.responseCode
-                        if (path.endsWith(".mjs")) {
+                        if (path.endsWith(".js")) {
                             assertTrue(connection.contentType, connection.contentType.substringBefore(';') in
                                 listOf("text/javascript", "application/javascript"))
                         }
@@ -54,7 +54,7 @@ class WebPagesTest {
                 val login = request("/login")
                 assertEquals(200, login.first)
                 assertTrue(login.second.contains("type=\"password\""))
-                for (path in listOf("style.css", "app.js", "worker.js", "host.js", "markdown.mjs", "vendor/markdown-it/markdown-it.esm.min.mjs", "icons/file.svg")) {
+                for (path in listOf("style.css", "app.js", "worker.js", "icons/file.svg", "THIRD-PARTY-NOTICES.txt")) {
                     val asset = request("/web/$path")
                     assertEquals(path, 200, asset.first)
                     assertFalse(path, asset.second.contains("<!doctype html>"))
