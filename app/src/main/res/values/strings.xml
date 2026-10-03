@@ -85,7 +85,7 @@
     <string name="server_error">服务启动失败</string>
     <string name="service_actions">服务操作</string>
     <string name="clear_shares_title">移除所有共享文件？</string>
-    <string name="clear_shares_help">仅从共享列表中移除，不会删除原文件。</string>
+    <string name="clear_shares_help">将清空共享列表，并永久删除应用内保存的本地文件。从其他位置添加的文件仅移除共享记录，原文件不会删除。</string>
     <string name="message_draft">输入消息，支持 Markdown</string>
     <string name="message_preview">预览</string>
     <string name="messages_empty">还没有消息</string>

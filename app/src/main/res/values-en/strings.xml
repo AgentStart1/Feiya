@@ -80,7 +80,7 @@
     <string name="server_error">Service failed</string>
     <string name="service_actions">Service actions</string>
     <string name="clear_shares_title">Remove all shared files?</string>
-    <string name="clear_shares_help">This only removes sharing entries. Original files are kept.</string>
+    <string name="clear_shares_help">This clears the sharing list and permanently deletes local files saved within the app. Files added from other locations are only removed from the sharing list; their originals are kept.</string>
     <string name="message_draft">Write a message, Markdown supported</string>
     <string name="message_preview">Preview</string>
     <string name="messages_empty">No messages yet</string>
