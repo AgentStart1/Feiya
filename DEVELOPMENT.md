@@ -298,6 +298,12 @@ scrollable history to 45% of their content height. Theme colors remain dynamic a
 support dark mode. File rows show actual names and URIs, not placeholder sizes
 or modification dates from the design concept.
 
+The edge-to-edge activity explicitly uses `adjustResize` so keyboard avoidance is
+handled by Compose IME insets rather than automatic window panning. Message and
+HID pages apply `imePadding()` after the shell padding has been consumed. When
+checking keyboard layout on a device, open and dismiss the keyboard in compact
+and wide windows and verify that the composer stays above it without excess space.
+
 `QrCodeHost` owns address discovery and QR encoding, using the application serial
 coordination dispatcher and background encoding. The composable observes state
 with lifecycle awareness and closes the Host when its dialog leaves composition.
