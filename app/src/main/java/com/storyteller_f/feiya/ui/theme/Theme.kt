@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalView
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 private val LightColors = lightColorScheme(
+    surfaceContainer = Color(0xFFEDF2E8),
+    surfaceContainerLow = Color(0xFFF5F8F0),
     primary = md_theme_light_primary,
     onPrimary = md_theme_light_onPrimary,
     primaryContainer = md_theme_light_primaryContainer,
@@ -48,6 +50,8 @@ private val LightColors = lightColorScheme(
 
 
 private val DarkColors = darkColorScheme(
+    surfaceContainer = Color(0xFF242A22),
+    surfaceContainerLow = Color(0xFF1E231C),
     primary = md_theme_dark_primary,
     onPrimary = md_theme_dark_onPrimary,
     primaryContainer = md_theme_dark_primaryContainer,

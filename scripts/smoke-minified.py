@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Install a signed minified APK on a disposable emulator and verify HTTP/WebSocket.
 
-CI invokes this directly on its dedicated emulator without a lock. For shared local
-devices, use smoke-minified.sh to acquire the device lock. Existing installations
-are never replaced or cleared. Only this run's install and forwarding are removed.
+Use a dedicated disposable emulator. Existing installations are never replaced
+or cleared. Only this run's install and forwarding are removed.
 """
 import base64
 import http.client

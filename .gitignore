@@ -16,3 +16,6 @@ local.properties
 /web/test/artifacts/
 
 /web/dist/
+
+# Local app design concepts and rendered previews
+/preview/

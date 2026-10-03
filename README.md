@@ -3,14 +3,28 @@
 [![Test](https://github.com/storytellerF/Feiya/actions/workflows/test.yml/badge.svg)](https://github.com/storytellerF/Feiya/actions/workflows/test.yml)
 [![Build](https://github.com/storytellerF/Feiya/actions/workflows/release.yml/badge.svg)](https://github.com/storytellerF/Feiya/actions/workflows/release.yml)
 
-Feiya lets you use your Android device as a Bluetooth keyboard for a computer,
-with text sending and physical-key controls for keyboard setup.
+Feiya shares files and messages on your local network and lets you use your
+Android device as a Bluetooth keyboard for a computer, with text sending and
+physical-key controls for keyboard setup.
 
 ## Requirements
 
 - Android 13 (API 33) or later, on a device that supports Bluetooth HID.
 - A computer that can pair with a Bluetooth keyboard.
 - Bluetooth enabled and the Bluetooth permissions requested by Feiya granted.
+
+## App navigation and file sharing
+
+On phones, use the bottom navigation to switch between files, messages, keyboard,
+security, and settings. Wider windows use a permanent side navigation. Select a
+shared file to see its details beside the list on a large screen; on phones, use
+**Back to files** or the system Back gesture to return to the list.
+
+Use **Add files** to share documents. File details provide a QR code for that file,
+local saving where supported, and **Remove from sharing**, which keeps the original
+file. The top bar shows the service port; tap it while the service is running to
+open the main QR code. Restart, stop, and clear-sharing actions are in the overflow
+menu. Clearing the sharing list requires confirmation.
 
 ## Send text
 

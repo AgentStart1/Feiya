@@ -185,10 +185,10 @@ installing the shared channel initializer.
 
 The runtime check is `scripts/smoke-minified.sh SERIAL SIGNED_APK PACKAGE OUTPUT_DIR`.
 Use a disposable emulator: it refuses to overwrite existing installations or test
-against an already-running HTTP listener on port 8080. For shared local devices, the wrapper acquires the
-device lock via `scripts/adb-device-lock.sh` before installation. CI uses a dedicated
-emulator and calls `scripts/smoke-minified.py` directly without locking. Both paths
-remove only their own installation and port forwarding. Results and startup logs go
+against an already-running HTTP listener on port 8080. The shell entry point
+forwards arguments directly to `scripts/smoke-minified.py`; CI invokes that Python
+script directly on its dedicated emulator. Both paths remove only their own
+installation and port forwarding. Results and startup logs go
 to the output directory; CI uploads them even if the smoke check fails. Use
 `scripts/sign-smoke-apks.sh OUTPUT_DIR ALPHA_UNSIGNED_APK RELEASE_UNSIGNED_APK` to
 create disposable signed copies for this check. This covers startup, HTTP, and
@@ -278,3 +278,42 @@ the same distribution as the APK. It is not an Android end-to-end test. Browser
 tests save screenshots to ignored `web/test/artifacts/`. `WebPagesTest` separately
 checks real Ktor routes, session login, and generated JS/CSS/icon/notice resources
 using a JVM server. The web build preserves local assets; no CDN is needed.
+
+## Adaptive Android UI
+
+`AppShell` uses the available window width: bottom navigation below 600 dp, a
+compact side rail from 600 dp, and a labeled sidebar from 1000 dp (224 dp, increasing to 280 dp in windows
+at least 1200 dp wide). Large font scales use icon navigation with accessibility
+labels instead of clipping bottom/rail labels.
+`SharedFiles` switches to a list/detail layout when its own content area reaches
+720 dp, after navigation has taken its space. Selection is saved by URI, survives
+reordering and saved-state restoration, and clears when the file disappears.
+Compact detail handles system Back before leaving the screen.
+
+Messages use a separate Markdown draft preview when their content area reaches
+800 dp; compact windows keep the composer below the timeline. Settings, security,
+and HID forms have an 840 dp maximum width. HID moves its task history into a
+280 dp supporting pane at 720 dp of content width; compact windows cap that
+scrollable history to 45% of their content height. Theme colors remain dynamic and
+support dark mode. File rows show actual names and URIs, not placeholder sizes
+or modification dates from the design concept.
+
+The edge-to-edge activity explicitly uses `adjustResize` so keyboard avoidance is
+handled by Compose IME insets rather than automatic window panning. Message and
+HID pages apply `imePadding()` after the shell padding has been consumed. When
+checking keyboard layout on a device, open and dismiss the keyboard in compact
+and wide windows and verify that the composer stays above it without excess space.
+
+`QrCodeHost` owns address discovery and QR encoding, using the application serial
+coordination dispatcher and background encoding. The composable observes state
+with lifecycle awareness and closes the Host when its dialog leaves composition.
+Changing file or port creates a new Host; switching address cancels prior encoding.
+
+Native file/navigation icons are Phosphor Core 2.1.1 paths converted to Android
+VectorDrawable resources; the MIT license is in `res/raw/phosphor_license.txt`.
+After updating the npm package, run `python3 scripts/update-android-icons.py`
+and commit the regenerated native drawables and license.
+
+Run `./gradlew :app:testDebugUnitTest --tests '*AdaptiveFilesTest'` for adaptive selection,
+saved-state, and rendering checks. Rendering captures are written under
+`app/build/outputs/design/`; these use Robolectric native graphics, not a device.

@@ -1,8 +1,5 @@
 package com.storyteller_f.feiya.ui.components
 
-import android.os.Build
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.toggleable
@@ -12,30 +9,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,15 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.feiya.BootSettingsState
@@ -60,128 +42,77 @@ import com.storyteller_f.feiya.R
 import com.storyteller_f.feiya.dataStore
 import com.storyteller_f.feiya.service.AppService
 import com.storyteller_f.feiya.service.ServerState
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 
-@Preview
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun MainToolbar(
-    port: String = AppService.DEFAULT_PORT.toString(),
-    restartService: () -> Unit = {},
-    stopService: () -> Unit = {},
-    sendText: (String) -> Unit = {},
-    openDrawer: () -> Unit = {},
-    deleteAll: () -> Unit = {},
-    stateFlow: Flow<ServerState> = MutableStateFlow(ServerState.Init),
+    title: String,
+    port: String,
+    state: ServerState,
+    restartService: () -> Unit,
+    stopService: () -> Unit,
+    sendText: (String) -> Unit,
+    deleteAll: () -> Unit,
+    showFileActions: Boolean,
+    about: () -> Unit,
 ) {
-    var showDialog by rememberSaveable { mutableStateOf(false) }
-    var errorDialogContent by remember {
-        mutableStateOf("")
-    }
-    val state by stateFlow.collectAsState(initial = ServerState.Init)
-
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.app_name))
-                Text(
-                    text = port,
-                    fontSize = 10.sp,
-                    color = when (state) {
-                        is ServerState.Error -> MaterialTheme.colorScheme.onError
-                        is ServerState.Stopped -> MaterialTheme.colorScheme.onTertiary
-                        is ServerState.Init -> MaterialTheme.colorScheme.onSecondary
-                        else -> MaterialTheme.colorScheme.onPrimary
-                    },
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .background(
-                            when (state) {
-                                is ServerState.Error -> MaterialTheme.colorScheme.error
-                                is ServerState.Stopped -> MaterialTheme.colorScheme.tertiary
-                                is ServerState.Init -> MaterialTheme.colorScheme.secondary
-                                else -> MaterialTheme.colorScheme.primary
-                            },
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(8.dp, 2.dp)
-                        .clickable {
-                            val currentState = state
-                            if (currentState is ServerState.Error) {
-                                errorDialogContent = currentState.cause.stackTraceToString()
-                            } else if (currentState is ServerState.Started) {
-                                showDialog = true
-                            }
-                        }
-                )
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = {
-                openDrawer()
-            }) {
-                Icon(Icons.Filled.Menu, contentDescription = null)
-            }
-        },
-        actions = {
-            IconButton(onClick = {
-                restartService()
-            }) {
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = stringResource(R.string.restart_service)
-                )
-            }
-            IconButton(onClick = {
-                stopService()
-            }) {
-                Icon(
-                    ImageVector.vectorResource(id = R.drawable.baseline_stop_24),
-                    contentDescription = stringResource(R.string.stop_service)
-                )
-            }
-            IconButton(onClick = {
-                deleteAll()
-            }) {
-                Icon(
-                    ImageVector.vectorResource(id = R.drawable.baseline_delete_24),
-                    contentDescription = stringResource(
-                        R.string.delete_all
-                    )
-                )
-            }
-        },
-
+    var showQr by rememberSaveable { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf(false) }
+    val status = stringResource(when (state) {
+        is ServerState.Started -> R.string.server_running
+        is ServerState.Stopped -> R.string.server_stopped
+        is ServerState.Error -> R.string.server_error
+        else -> R.string.service_starting
+    })
+    androidx.compose.foundation.layout.BoxWithConstraints {
+        val wide = maxWidth >= 600.dp
+        TopAppBar(
+            expandedHeight = if (wide) 80.dp else 64.dp,
+            title = {
+                Column {
+                    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if (!wide) Text(status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            actions = {
+                TextButton(onClick = { if (state is ServerState.Error) showError = true else showQr = true }, enabled = state is ServerState.Started || state is ServerState.Error) {
+                    Text(if (wide) "$status · $port" else port, color = if (state is ServerState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                }
+                if (state is ServerState.Started && wide) TextButton(onClick = { showQr = true }) { Text(stringResource(R.string.qrcode)) }
+                Box {
+                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.service_actions)) }
+                    androidx.compose.material3.DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(status) }, onClick = { showMenu = false; if (state is ServerState.Error) showError = true }, enabled = state is ServerState.Error)
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.restart_service)) }, onClick = { showMenu = false; restartService() })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.stop_service)) }, onClick = { showMenu = false; stopService() })
+                        if (showFileActions) androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.delete_all)) }, onClick = { showMenu = false; confirmClear = true })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.about)) }, onClick = { showMenu = false; about() })
+                    }
+                }
+            },
         )
-    val (_, qrcodeHorLayout) = computeQrcodeLayout()
-    if (showDialog) {
-        BasicAlertDialog(
-            onDismissRequest = { showDialog = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = !qrcodeHorLayout
-            ),
-        ) {
-            Surface(shape = RoundedCornerShape(8.dp)) {
-                ShowQrCode(sub = "", port = port, modifier = Modifier.padding(20.dp)) {
-                    showDialog = false
-                    sendText(it)
-                }
-            }
-        }
     }
-    if (errorDialogContent.isNotEmpty()) {
-        val scrollState = rememberScrollState()
-        AlertDialog(onDismissRequest = { errorDialogContent = "" }, confirmButton = {
-            Text(text = "Close", modifier = Modifier
-                .clickable {
-                    errorDialogContent = ""
-                }
-            )
-        }, text = {
-            Text(text = errorDialogContent, modifier = Modifier.verticalScroll(scrollState))
-        })
-    }
+    if (showQr) AlertDialog(
+        onDismissRequest = { showQr = false },
+        title = { Text(stringResource(R.string.qrcode)) },
+        text = { ShowQrCode("", port, sendText = sendText) },
+        confirmButton = { TextButton(onClick = { showQr = false }) { Text(stringResource(android.R.string.ok)) } },
+    )
+    if (confirmClear) AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text(stringResource(R.string.clear_shares_title)) },
+        text = { Text(stringResource(R.string.clear_shares_help)) },
+        confirmButton = { TextButton(onClick = { confirmClear = false; deleteAll() }) { Text(stringResource(R.string.delete_all)) } },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel_action)) } },
+    )
+    if (showError) AlertDialog(
+        onDismissRequest = { showError = false },
+        title = { Text(stringResource(R.string.server_error)) },
+        text = { Text((state as? ServerState.Error)?.cause?.message.orEmpty(), Modifier.verticalScroll(rememberScrollState())) },
+        confirmButton = { TextButton(onClick = { showError = false }) { Text(stringResource(android.R.string.ok)) } },
+    )
 }
 
 @Preview
@@ -201,7 +132,7 @@ fun SettingPage(
             EditTextPref(
                 key = "port",
                 title = stringResource(R.string.port),
-                summary = "server listen on $port",
+                summary = stringResource(R.string.listen_port_hint, port),
                 dialogTitle = stringResource(R.string.port_setting),
                 dialogMessage = stringResource(R.string.please_input_a_valid_port),
                 defaultValue = AppService.DEFAULT_PORT.toString()
@@ -243,82 +174,6 @@ fun BootPreference(state: BootSettingsState, onToggle: (Boolean) -> Unit, onRetr
             }
         }
     }
-}
-
-@Preview
-@Composable
-fun NavDrawer(
-    closeDrawer: () -> Unit = {},
-    navigateTo: (String) -> Unit = {},
-    openAboutPage: () -> Unit = {}
-) {
-
-    NavigationDrawerItem(
-        label = {
-            Text(text = stringResource(R.string.home))
-        },
-        icon = {
-            Icon(Icons.Filled.Home, contentDescription = stringResource(id = R.string.home))
-        },
-        selected = false,
-        onClick = {
-            navigateTo("main")
-            closeDrawer()
-        })
-
-    NavigationDrawerItem(label = { Text(text = stringResource(R.string.messages)) }, icon = {
-        Icon(Icons.Filled.AccountBox, contentDescription = stringResource(R.string.messages))
-    }, selected = false, onClick = {
-        navigateTo("messages")
-        closeDrawer()
-    })
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        NavigationDrawerItem(label = { Text(text = "hid") }, icon = {
-            Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.messages))
-        }, selected = false, onClick = {
-            navigateTo("hid")
-            closeDrawer()
-        })
-    }
-
-    NavigationDrawerItem(label = { Text(text = "保护措施") }, icon = {
-        Icon(
-            ImageVector.vectorResource(R.drawable.baseline_password_24),
-            contentDescription = "safe"
-        )
-    }, selected = false, onClick = {
-        navigateTo("safe")
-        closeDrawer()
-    })
-
-    NavigationDrawerItem(
-        label = {
-            Text(text = stringResource(R.string.about))
-        },
-        icon = {
-            Icon(Icons.Filled.Info, contentDescription = stringResource(id = R.string.about))
-        },
-        selected = false,
-        onClick = {
-            openAboutPage()
-            closeDrawer()
-        })
-    NavigationDrawerItem(
-        label = {
-            Text(text = stringResource(R.string.settings))
-        },
-        icon = {
-            Icon(
-                Icons.Filled.Settings,
-                contentDescription = stringResource(id = R.string.settings)
-            )
-        },
-        selected = false,
-        onClick = {
-            navigateTo("settings")
-            closeDrawer()
-        })
 }
 
 @Composable

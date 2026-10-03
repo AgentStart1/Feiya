@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,9 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,13 +36,11 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
-import androidx.window.core.layout.WindowWidthSizeClass
 import coil.compose.AsyncImage
 import com.storyteller_f.feiya.R
 import com.storyteller_f.feiya.service.Message
@@ -65,12 +64,6 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
     var maxLines by remember {
         mutableIntStateOf(MAX_LINE)
     }
-    val measurer = rememberTextMeasurer()
-    val lineCount by remember {
-        derivedStateOf {
-            measurer.measure(item.data).lineCount
-        }
-    }
     Row(modifier = Modifier
         .clickable {
             expanded = true
@@ -87,10 +80,10 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         )
 
-        Column(modifier = Modifier.padding(start = 8.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
             Text(text = item.from)
             MarkdownText(markdown = item.data, maxLines = maxLines)
-            if (lineCount > MAX_LINE) {
+            if (item.data.length > 160 || item.data.count { it == '\n' } >= MAX_LINE) {
                 Button(onClick = {
                     maxLines = if (maxLines == MAX_LINE) {
                         Int.MAX_VALUE
@@ -129,62 +122,25 @@ fun MessagePage(
     initMessage: String = "",
     sendMessage: (String) -> Unit = {}
 ) {
-    var content by remember {
-        mutableStateOf(initMessage)
-    }
-    val scrollState = rememberScrollState()
-    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    if (windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Box(
-                modifier = Modifier
-                    .weight(1f),
-            ) {
-                LazyColumn(modifier = Modifier.padding(bottom = 8.dp)) {
-                    items(messageList.size) {
-                        MessageItem(item = messageList[it])
-                    }
+    var content by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initMessage) }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
+        val wide = maxWidth >= 800.dp
+        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(24.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                if (messageList.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.messages_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    items(messageList.size) { MessageItem(messageList[it]) }
                 }
-                MarkdownText(
-                    markdown = content,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(8.dp)
-                        .verticalScroll(scrollState)
-                )
+                if (!wide) InputGroup(content, { content = it }, sendMessage)
             }
-
-            InputGroup(content = content, onValueChange = {
-                content = it
-            }, sendMessage = sendMessage)
-        }
-
-    } else {
-        Row(modifier = Modifier.padding(20.dp)) {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(bottom = 8.dp)
-                    .weight(1f)
-            ) {
-                items(messageList.size) {
-                    MessageItem(item = messageList[it])
+            if (wide) {
+                androidx.compose.material3.VerticalDivider()
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Text(stringResource(R.string.message_preview), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
+                    MarkdownText(content, modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))
+                    InputGroup(content, { content = it }, sendMessage)
                 }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                MarkdownText(
-                    markdown = content,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(8.dp)
-                        .verticalScroll(scrollState)
-                        .weight(1f)
-                )
-                InputGroup(content = content, onValueChange = {
-                    content = it
-                }, sendMessage = sendMessage)
             }
         }
     }
@@ -197,6 +153,7 @@ fun InputGroup(content: String, onValueChange: (String) -> Unit, sendMessage: (S
         verticalAlignment = Alignment.CenterVertically
     ) {
         TextField(
+            placeholder = { Text(stringResource(R.string.message_draft)) },
             value = content, onValueChange = {
                 onValueChange(it)
             }, modifier = Modifier
@@ -206,7 +163,7 @@ fun InputGroup(content: String, onValueChange: (String) -> Unit, sendMessage: (S
         Button(onClick = {
             sendMessage(content)
             onValueChange("")
-        }, modifier = Modifier.padding(start = 8.dp)) {
+        }, enabled = content.isNotBlank(), modifier = Modifier.padding(start = 8.dp)) {
             Text(text = stringResource(R.string.send))
         }
     }
