@@ -156,6 +156,19 @@ boot gating, timeout and denied-start cleanup, manifest receiver delivery, and f
 promotion without notification permission. Actual reboot and manufacturer autostart
 restrictions require device testing and remain unverified in this environment.
 
+## CI Gradle caching
+
+PR tests and main release builds use the same pinned `gradle/actions/setup-gradle`
+action with `cache-provider: enhanced`. Keep both workflows aligned and do not add
+`setup-java` Gradle caching or another Gradle User Home cache alongside it. Builds
+continue to use `./gradlew`; the Wrapper defines the Gradle version.
+
+The action defaults to writing caches only on the default branch; PRs restore
+compatible default-branch entries without writing their own. When evaluating cache
+changes, check the setup-gradle logs and job summary for restored entries and
+compare cold/warm timings, transfer sizes, and repository cache storage. Successful
+builds alone do not establish cache reuse or a performance improvement.
+
 ## Minified builds
 
 PR CI assembles both Alpha and Release without signing secrets, in addition to tests.
